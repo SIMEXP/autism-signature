@@ -1,15 +1,17 @@
 # Code for the high risk autism phenotype paper
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
-[![DOI](https://img.shields.io/badge/DOI-10.1101%2F2020.06.01.127688%20-informational)](https://doi.org/10.1101/2020.06.01.127688 )
 
-## Steps to reproduce the analysis
-### Data
-The study uses data from ABIDE 1 and 2 datasets. Participants were matched using propensity score matching, which was completed as part of a separate project - the scripts are here (LINK).
-Resting state functional connectivity data was preprocessed using NIAK, described in the paper. This study uses the seed maps.
-Using the following scripts the full analysis can be reproduced. Alternatively, to skip the data analysis part and recreate the figures, download all results data from (LINK).
+Much of the code in this repo originated from [ASD High Risk Endophenotype Code Supplement](https://github.com/surchs/ASD_high_risk_endophenotype_code_supplement) and was written by Sebastian Urchs and Hien Nguyen.
+
+### Data availability
+All data to reproduce the analysis can be downloaded from [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15192559.svg)](https://doi.org/10.5281/zenodo.15192559)
+
+- The study uses data from ABIDE 1 and 2 datasets. Participants were matched using propensity score matching as part of another project, matching scripts can be found here [ASD Subtype Code Supplement](https://github.com/surchs/ASD_subtype_code_supplement/tree/master/scripts/pheno).
+- Resting state functional connectivity data was preprocessed using NIAK, described in the paper. This study uses the seed maps.
+- Using the following scripts the full analysis can be reproduced. Alternatively, to skip the data analysis part and recreate the figures, download only the results and atlas data from Zenodo.
 
 ### Data analysis
-These steps were run on the Alliance Canada Beluga server. Download the data from (LINK) and update the paths and slurm preamble.
+These steps were run on the Alliance Canada Beluga server.
 
 On an HPC server, first set up the R environment. After cloning the repository:
 1. Open R in the project directory
@@ -22,7 +24,7 @@ source hpc_py11_env/bin/activate
 pip install -r environments/requirements_py11.txt
 ```
 
-Run:
+Update the paths and slurm preamble, then run:
 1. `Discovery_Conformal_Score.R` using `submit_discovery.sh`
 2. `Discovery_Read_Conformal_Scores.R`
 3. `Validation_Conformal_Score_Boot.R` using `submit_validation.sh`
@@ -39,7 +41,7 @@ Run:
 6. `build_residuals_validation.py` using `submit_residuals.py`
 
 ### Supplemental analyses and figures
-If you skipped the data analysis part, download the results and data files from (LINK). Set up the local Python environment:
+Make sure you have downloaded the atlas files from Zenodo. If you skipped the data analysis part, just download the results and data files. Set up the local Python environment:
 
 ```
 python -m venv env
@@ -61,8 +63,3 @@ Run:
 7. `figure_4_dice.ipynb`
 8. `figure_4_ppv.ipynb`
 9. `figure_7_conformal_space.ipynb`
-
-
-
-
-
