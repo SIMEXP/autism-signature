@@ -1,0 +1,5 @@
+# Ignore all fetched and extracted data
+Results/
+Discovery/
+Null/
+Validation/

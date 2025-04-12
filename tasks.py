@@ -1,26 +1,11 @@
 from invoke import task, Context
 import os
-import subprocess
+import shutil
+import glob
 import sys
 import random
 
-## Helper functions
-def run_container(command, volumes=None, image="autism-signature"):
-    """
-    Run a command inside the Docker container.
-
-    Parameters:
-        command (str): The shell command to run inside the container.
-        volumes (dict): A dict mapping host paths to container paths.
-        image (str): Docker image to use.
-    """
-    volumes = volumes or {os.getcwd(): "/home/jovyan/work"}
-    volume_args = " ".join([f"-v {host}:{container}" for host, container in volumes.items()])
-    container_cmd = f"docker run --rm {volume_args} -w /home/jovyan/work {image} bash -c \"{command}\""
-    Context().run(container_cmd)
-
-
-## SET UP
+## SET UP ENVIRONMENT
 @task
 def setup_env_python(c):
     """
@@ -39,46 +24,193 @@ def setup_env_r(c):
     """
     print("📦 Restoring R environment system-wide...")
 
-    lockfile_path = "Requirements/renv.lock"
+    lockfile_path = "renv.lock"
+    lib_path = "/usr/local/lib/R/site-library"
+
     if not os.path.exists(lockfile_path):
         print(f"❌ Lockfile not found at {lockfile_path}.")
         return
 
+    # install renv explicitly to known path
     c.run(
-        'Rscript -e "install.packages(\'renv\', repos=\'https://cloud.r-project.org\')"'
-    )
-    c.run(
-        f'Rscript -e "renv::restore(lockfile = \'{lockfile_path}\', '
-        f'library = \'/usr/local/lib/R/site-library\')"'
+        f'Rscript -e "install.packages(\'renv\', lib = \'{lib_path}\', repos = \'https://cloud.r-project.org\')"'
     )
 
+    # restore with matching lib path in .libPaths()
+    c.run(
+        f'Rscript -e ".libPaths(\'{lib_path}\'); '
+        f'renv::restore(lockfile = \'{lockfile_path}\', library = \'{lib_path}\')"'
+    )
+
+### FETCH SOURCE DATA
 @task
-def setup_env_data(c):
+def fetch_atlas(c):
     """
-    Download source data and prepare sourcedata folder.
+    Download and unzip the ATLAS archive into source_data/.
     """
-    print("📥 Downloading source data from Zenodo...")
-    c.run("mkdir -p sourcedata")
+    url = "https://zenodo.org/records/15192559/files/ATLAS.zip?download=1"
+    dest_dir = "source_data/ATLAS"
+    zip_path = "source_data/ATLAS.zip"
 
-    # Replace 'filename.zip' with the actual archive name if known
-    c.run("wget -O sourcedata/data.zip https://zenodo.org/record/15192559/files/autism-signature-sourcedata.zip?download=1")
-    c.run("unzip -o sourcedata/data.zip -d sourcedata")
-    c.run("rm sourcedata/data.zip")
+    if os.path.exists(dest_dir):
+        print(f"🧠 ATLAS already extracted at {dest_dir}")
+        return
 
-    # Add placeholder for documentation
-    with open("sourcedata/CONTENT.md", "w") as f:
-        f.write("# Source Data\\n\\nData downloaded from Zenodo: https://doi.org/10.5281/zenodo.15192559\\n")
+    os.makedirs("source_data", exist_ok=True)
+    print("📥 Downloading ATLAS...")
+    c.run(f"wget -O {zip_path} '{url}'")
+    print("🗃️ Unzipping ATLAS...")
+    c.run(f"unzip {zip_path} -d source_data/")
+    c.run(f"rm {zip_path}")
 
-    print("✨ Source data setup complete.")
-
-### BUILD THINGS
 @task
-def build_docker(c):
+def fetch_fmri(c):
+    """
+    Download and unzip the fMRI Data archive into source_data/.
+    """
+    url = "https://zenodo.org/records/15192559/files/Data.zip?download=1"
+    dest_dir = "source_data/Data"
+    zip_path = "source_data/Data.zip"
+
+    if os.path.exists(dest_dir):
+        print(f"🧬 fMRI data already extracted at {dest_dir}")
+        return
+
+    os.makedirs("source_data", exist_ok=True)
+    print("📥 Downloading fMRI data...")
+    c.run(f"wget -O {zip_path} '{url}'")
+    print("🗃️ Unzipping fMRI data...")
+    c.run(f"unzip {zip_path} -d source_data/")
+    c.run(f"rm {zip_path}")
+
+@task(pre=[fetch_atlas, fetch_fmri])
+def setup_source_data(c):
+    """
+    Fetch all source data (atlases + fMRI) and unzip it under source_data/.
+    """
+    print("✨ All source data ready.")
+
+### FETCH OUTPUT_DATA
+@task
+def fetch_results(c):
+    """
+    Download and extract the Results.zip archive from Zenodo into output_data/.
+    """
+    url = "https://zenodo.org/records/15192559/files/Results.zip?download=1"
+    zip_path = "output_data/Results.zip"
+    dest_dir = "output_data"
+
+    if os.path.exists(os.path.join(dest_dir, "Results")):
+        print("🧠 Results already appear to be extracted. Run 'invoke clean-results' to clean previous download before fetching.")
+        return
+
+    os.makedirs(dest_dir, exist_ok=True)
+
+    print("📥 Downloading Results.zip...")
+    c.run(f"wget -O {zip_path} '{url}'")
+
+    print("🗃️ Unzipping archive into output_data/...")
+    c.run(f"unzip -o {zip_path} -d {dest_dir}")
+    c.run(f"rm {zip_path}")
+
+    print("✅ Results fetched and unzipped.")
+
+### CONTAINER OPERATIONS
+@task
+def container_build(c):
     """
     Build the Docker image from the Dockerfile in the project root.
     """
-    print("🐳 Building Docker image: autism-signature")
+    print("🐳 Building Docker image: autism_signature")
     c.run("docker build -t autism_signature .")
+
+@task
+def container_archive(c, image="autism_signature", output="autism_signature.tar.gz"):
+    """
+    Save the Docker image to a compressed archive for Zenodo or transport.
+    """
+    print(f"📦 Archiving Docker image '{image}' to {output}...")
+    c.run(f"docker save {image} | gzip > {output}")
+    print("🪦 Archive complete.")
+
+@task
+def container_setup(c, url="https://zenodo.org/record/15192559/files/autism-signature.tar.gz", output="autism-signature.tar.gz"):
+    """
+    Download and load the prebuilt Docker image from Zenodo.
+    """
+    if not os.path.exists(output):
+        print(f"📥 Downloading container from {url}...")
+        c.run(f"wget -O {output} '{url}'")
+    else:
+        print(f"📦 Container archive already exists: {output}")
+
+    print("🐳 Loading Docker image...")
+    c.run(f"gunzip -c {output} | docker load")
+
+    print("✨ Container setup complete.")
+
+def container_run(command, volumes=None, image="autism_signature"):
+    """
+    Run a command inside the Docker container.
+
+    Parameters:
+        command (str): The shell command to run inside the container.
+        volumes (dict): A dict mapping host paths to container paths.
+        image (str): Docker image to use.
+    """
+    volumes = volumes or {os.getcwd(): "/home/jovyan/work"}
+    volume_args = " ".join([f"-v {host}:{container}" for host, container in volumes.items()])
+    container_cmd = f"docker run --rm {volume_args} -w /home/jovyan/work {image} bash -c \"{command}\""
+    Context().run(container_cmd)
+
+### RUN ANALYSES
+@task
+def run_discovery(c, output_dir="./output_data/Discovery", network=18, replication=100, debug=False):
+    """
+    Run the discovery conformal score analysis for selected networks and replications.
+        network: (integer) number of networks to process (max 18, default: 18)
+        replication: (integer) number of bootstrap replications to generate (default: 100)
+    """
+    working_dir = os.path.join(".", "source_data", "Data")
+    debug_flag = "TRUE" if debug else "FALSE"
+
+    if not os.path.exists(working_dir):
+        print(f"❌ Source data missing in {working_dir}. Run 'invoke setup-source-data' first.")
+        return
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    for n in range(network):
+        for r in range(replication):
+            net_id = n + 1  # cursed 1-indexing
+            rep_id = r + 1
+            container_output_dir = f"/home/jovyan/work/{os.path.relpath(output_dir)}"
+            result_file = os.path.join(output_dir, f"Results_Instance_{rep_id}_Network_{net_id}.csv")
+
+            if os.path.exists(result_file):
+                print(f"🟡 Skipping existing: {result_file}")
+                continue
+
+            print(f"🔮 Running replicate {rep_id}, network {net_id}")
+            cmd = (
+                f"Rscript code/data_analysis/discovery_conformal_score.R "
+                f"{rep_id} {rep_id} {net_id} {working_dir} {container_output_dir} {debug_flag}"
+            )
+            container_run(cmd)
+
+### CLEANING
+@task
+def clean_discovery(c):
+    """
+    Remove the entire output_data/Discovery folder and its contents.
+    """
+    discovery_dir = "output_data/Discovery"
+
+    if os.path.exists(discovery_dir):
+        shutil.rmtree(discovery_dir)
+        print(f"💥 Removed {discovery_dir} and all its contents.")
+    else:
+        print("🫧 No Discovery folder to remove.")
 
 @task
 def clean_results(c):

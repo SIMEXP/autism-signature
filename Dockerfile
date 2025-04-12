@@ -1,5 +1,5 @@
 # Start from the blessed Jupyter base
-FROM jupyter/base-notebook:python-3.10
+FROM jupyter/r-notebook:python-3.10
 
 # Switch to root to install system-level dependencies
 USER root
@@ -10,29 +10,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblapack-dev \
     libblas-dev \
     libssl-dev \
+    libpng-dev \
+    make \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a local user library for R packages
-ENV R_LIBS_USER=/home/jovyan/.local/R_libs
-RUN mkdir -p $R_LIBS_USER
-
-# Switch back to jovyan user for safety
+# Install invoke and get repo tasks
 USER $NB_UID
-
-# Copy only the Requirements folder (assume it's mounted or copied in build context)
-COPY requirements_extra/ ./requirements_extra/
-
-# Install invoke and other Python dependencies
-COPY requirements.txt /tmp/
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-
-# Install dependencies
+RUN pip install invoke
 COPY tasks.py ./tasks.py
-RUN invoke setup-env-python
-RUN invoke setup-env-r
 
-# Optional: copy full codebase later, or mount it in docker-compose or with volume
-# COPY . /home/jovyan/work/
+# R install
+USER root
+COPY renv.lock ./renv.lock
+RUN invoke setup-env-r
+RUN echo '.libPaths("/usr/local/lib/R/site-library")' >> /opt/conda/lib/R/etc/Rprofile.site
+RUN echo '.libPaths("/usr/local/lib/R/site-library")' >> /opt/conda/lib/R/etc/Rprofile.site && \
+    echo 'reticulate::use_python("/opt/conda/bin/python", required = TRUE)' >> /opt/conda/lib/R/etc/Rprofile.site
+
+# Python install
+USER $NB_UID
+RUN pip install numpy
+#COPY requirements.txt ./requirements.txt
+#RUN invoke setup-env-python
 
 WORKDIR /home/jovyan/work

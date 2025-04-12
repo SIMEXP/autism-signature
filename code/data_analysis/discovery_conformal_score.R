@@ -5,7 +5,6 @@
 library(compiler)
 library(fastcluster)
 library(reticulate)
-use_python("")
 library(Rcpp)
 library(RcppArmadillo)
 library(Rfast)
@@ -18,6 +17,7 @@ Replicate <- strtoi(args[2])
 Network <- strtoi(args[3])
 Working_Directory <- args[4]
 Output_Directory <- args[5]
+Debug.Flag <- ifelse(length(args) >= 6, args[6] == "TRUE", FALSE)
 
 # Turn on JIT
 enableJIT(3)
@@ -29,6 +29,12 @@ setwd(Working_Directory)
 # Shape: (Subjects, Voxels, Networks)
 seed_maps <- np$load("seed_maps_no_cereb.npy")
 phenos <- read.delim("ABIDE1_Pheno_PSM_matched.tsv")
+
+# Reduce data size for debugging
+if (Debug.Flag) {
+  cat("⚠️  DEBUG MODE ACTIVE: limiting phenos to 20 rows\n"); flush.console()
+  phenos <- phenos[1:20, ]
+}
 
 # Set a random seed
 set.seed(Random.Seed)
@@ -49,6 +55,8 @@ p0_values <- c()
 
 # Start to compute p_values
 for (i_test in 1:dim(phenos)[1]) {
+  # Verbose progress
+  cat(paste("🧮 Iteration", i_test, "of", dim(phenos)[1], "\n")); flush.console()
   # Start timer
   tick <- proc.time()
 
