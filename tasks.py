@@ -165,11 +165,11 @@ def container_run(command, volumes=None, image="autism_signature"):
 
 ### RUN ANALYSES
 @task
-def run_discovery(c, output_dir="./output_data/Discovery", network=18, replication=100, debug=False):
+def run_discovery(c, output_dir="./output_data/Discovery", network=None, replication=None, debug=False):
     """
     Run the discovery conformal score analysis for selected networks and replications.
-        network: (integer) number of networks to process (max 18, default: 18)
-        replication: (integer) number of bootstrap replications to generate (default: 100)
+        network: (integer) index of network to process using 0-indexing (default None: loop over all)
+        replication: (integer) index of bootstrap replication to generate using 0-indexing (default: None, generate 100)
     """
     working_dir = os.path.join(".", "source_data", "Data")
     debug_flag = "TRUE" if debug else "FALSE"
@@ -180,8 +180,12 @@ def run_discovery(c, output_dir="./output_data/Discovery", network=18, replicati
 
     os.makedirs(output_dir, exist_ok=True)
 
-    for n in range(network):
-        for r in range(replication):
+    # Use specified network and replication index, or by default run everything
+    list_replication = [int(replication)] if replication is not None else range(100)
+    list_network = [int(network)] if network is not None else range(18)
+
+    for n in list_network:
+        for r in list_replication:
             net_id = n + 1  # cursed 1-indexing
             rep_id = r + 1
             container_output_dir = f"/home/jovyan/work/{os.path.relpath(output_dir)}"
