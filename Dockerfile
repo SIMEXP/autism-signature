@@ -30,8 +30,7 @@ RUN echo '.libPaths("/usr/local/lib/R/site-library")' >> /opt/conda/lib/R/etc/Rp
 
 # Python install
 USER $NB_UID
-RUN pip install numpy
-#COPY requirements.txt ./requirements.txt
-#RUN invoke setup-env-python
+COPY requirements.txt ./requirements.txt
+RUN invoke setup-env-python
 
 WORKDIR /home/jovyan/work

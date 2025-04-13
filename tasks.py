@@ -149,20 +149,6 @@ def container_setup(c, url="https://zenodo.org/record/15192559/files/autism-sign
 
     print("✨ Container setup complete.")
 
-def container_run(command, volumes=None, image="autism_signature"):
-    """
-    Run a command inside the Docker container.
-
-    Parameters:
-        command (str): The shell command to run inside the container.
-        volumes (dict): A dict mapping host paths to container paths.
-        image (str): Docker image to use.
-    """
-    volumes = volumes or {os.getcwd(): "/home/jovyan/work"}
-    volume_args = " ".join([f"-v {host}:{container}" for host, container in volumes.items()])
-    container_cmd = f"docker run --rm {volume_args} -w /home/jovyan/work {image} bash -c \"{command}\""
-    Context().run(container_cmd)
-
 ### RUN ANALYSES
 @task
 def run_discovery(c, output_dir="./output_data/Discovery", network=None, replication=None, debug=False):
@@ -200,47 +186,60 @@ def run_discovery(c, output_dir="./output_data/Discovery", network=None, replica
                 f"Rscript code/data_analysis/discovery_conformal_score.R "
                 f"{rep_id} {rep_id} {net_id} {working_dir} {container_output_dir} {debug_flag}"
             )
-            container_run(cmd)
+            c.run(cmd)
+
+@task
+def run_figures(c):
+    """
+    Run figure notebooks in code/figures/, skipping any that have already been executed.
+    Assumes each notebook has an output folder under output_data/figures/{notebook_stem}.
+    """
+    import pathlib
+
+    notebooks_dir = pathlib.Path("code/figures")
+    output_base = pathlib.Path("output_data/Figures")
+
+    notebooks = sorted(notebooks_dir.glob("*.ipynb"))
+
+    if not notebooks:
+        print("⚠️ No notebooks found in code/figures/")
+        return
+
+    for nb in notebooks:
+        fig_name = nb.stem
+        fig_output_dir = output_base / fig_name
+
+        if fig_output_dir.exists():
+            print(f"✅ Skipping {nb.name} (output exists)")
+            continue
+
+        print(f"📈 Running {nb.name}...")
+        c.run(f"jupyter nbconvert --to notebook --execute --inplace {nb}")
+
+    print("🎉 Figure notebooks processed.")
 
 ### CLEANING
+def _clean(dir_name):
+    if os.path.exists(dir_name):
+        shutil.rmtree(dir_name)
+        print(f"💥 Removed {dir_name} and all its contents.")
+    else:
+        print(f"🫧 No {dir_name} folder to remove.")
 @task
 def clean_discovery(c):
     """
     Remove the entire output_data/Discovery folder and its contents.
     """
-    discovery_dir = "output_data/Discovery"
-
-    if os.path.exists(discovery_dir):
-        shutil.rmtree(discovery_dir)
-        print(f"💥 Removed {discovery_dir} and all its contents.")
-    else:
-        print("🫧 No Discovery folder to remove.")
+    _clean("output_data/Discovery")
 
 @task
-def clean_results(c):
+def clean_figures(c):
     """
-    Clean up old results.
+    Remove the entire output_data/Figures folder and its contents.
     """
-    print("🧹 Cleaning Results directory...")
-    c.run("rm -rf Results/*", warn=True)
+    _clean("output_data/Figures")
 
-@task
-def run_analysis(c):
-    """
-    Run all R and Python analysis scripts.
-    """
-    print("🚀 Running analysis scripts...")
-    c.run("Rscript Code/Data_analysis/Discovery_Conformal_Score.R")
-    c.run("Rscript Code/Data_analysis/Validation_Conformal_Score.R")
-    c.run("python3 Code/Data_analysis/build_residuals_validation.py")
 
-@task
-def build_figures(c):
-    """
-    Execute all Jupyter notebooks to regenerate figures.
-    """
-    print("📊 Rebuilding figures from notebooks...")
-    c.run("jupyter nbconvert --execute --inplace Code/Figures/*.ipynb")
 
 # @task(pre=[check_env, check_seeds, clean_results, run_analysis, build_figures])
 # def all(c):
