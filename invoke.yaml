@@ -1,0 +1,37 @@
+# invoke.yaml
+container_image: autism_signature
+
+# Code folder
+code_dir: code
+
+# Data folders
+source_data_dir: source_data
+output_data_dir: output_data
+output_discovery: output_data/Discovery
+figures_dir: output_data/Figures
+
+# Optional:
+# Zenodo data sources
+fetch_zenodo:
+  atlas:
+    url: https://zenodo.org/records/15192559/files/ATLAS.zip?download=1
+    dest: source_data/ATLAS
+    zip: source_data/ATLAS.zip
+
+  fmri:
+    url: https://zenodo.org/records/15192559/files/Data.zip?download=1
+    dest: source_data/Data
+    zip: source_data/Data.zip
+
+  results:
+    url: https://zenodo.org/records/15192559/files/Results.zip?download=1
+    dest: output_data/Results
+    zip: output_data/Results.zip
+
+# Optional:
+# archive URL for the docker archive
+# this needs to be manually specified.
+container_archive: https://zenodo.org/record/XXXXXXX/files/autism_signature.tar.gz
+
+# notebook dir if reused
+notebooks_dir: code/figures

@@ -4,18 +4,14 @@ import shutil
 import glob
 import sys
 import random
-
-## SET UP ENVIRONMENT
-@task
-def setup_env_python(c):
-    """
-    Install Python requirements based on Python version.
-
-    Args:
-        target (String) which requirements to use ("3.10", "3.11" or "figures", which is a 3.10 variant)
-    """
-    print("🐍 Installing Python requirements...")
-    c.run(f"pip install -r requirements.txt")
+from tasks_utils import (
+    clean_folder,
+    container_build,
+    container_archive,
+    container_setup,
+    container_run,
+    fetch_from_zenodo,
+)
 
 @task
 def setup_env_r(c):
@@ -45,43 +41,11 @@ def setup_env_r(c):
 ### FETCH SOURCE DATA
 @task
 def fetch_atlas(c):
-    """
-    Download and unzip the ATLAS archive into source_data/.
-    """
-    url = "https://zenodo.org/records/15192559/files/ATLAS.zip?download=1"
-    dest_dir = "source_data/ATLAS"
-    zip_path = "source_data/ATLAS.zip"
-
-    if os.path.exists(dest_dir):
-        print(f"🧠 ATLAS already extracted at {dest_dir}")
-        return
-
-    os.makedirs("source_data", exist_ok=True)
-    print("📥 Downloading ATLAS...")
-    c.run(f"wget -O {zip_path} '{url}'")
-    print("🗃️ Unzipping ATLAS...")
-    c.run(f"unzip {zip_path} -d source_data/")
-    c.run(f"rm {zip_path}")
+    fetch_from_zenodo(c, name="atlas")
 
 @task
 def fetch_fmri(c):
-    """
-    Download and unzip the fMRI Data archive into source_data/.
-    """
-    url = "https://zenodo.org/records/15192559/files/Data.zip?download=1"
-    dest_dir = "source_data/Data"
-    zip_path = "source_data/Data.zip"
-
-    if os.path.exists(dest_dir):
-        print(f"🧬 fMRI data already extracted at {dest_dir}")
-        return
-
-    os.makedirs("source_data", exist_ok=True)
-    print("📥 Downloading fMRI data...")
-    c.run(f"wget -O {zip_path} '{url}'")
-    print("🗃️ Unzipping fMRI data...")
-    c.run(f"unzip {zip_path} -d source_data/")
-    c.run(f"rm {zip_path}")
+    fetch_from_zenodo(c, name="fmri")
 
 @task(pre=[fetch_atlas, fetch_fmri])
 def setup_source_data(c):
@@ -93,61 +57,7 @@ def setup_source_data(c):
 ### FETCH OUTPUT_DATA
 @task
 def fetch_results(c):
-    """
-    Download and extract the Results.zip archive from Zenodo into output_data/.
-    """
-    url = "https://zenodo.org/records/15192559/files/Results.zip?download=1"
-    zip_path = "output_data/Results.zip"
-    dest_dir = "output_data"
-
-    if os.path.exists(os.path.join(dest_dir, "Results")):
-        print("🧠 Results already appear to be extracted. Run 'invoke clean-results' to clean previous download before fetching.")
-        return
-
-    os.makedirs(dest_dir, exist_ok=True)
-
-    print("📥 Downloading Results.zip...")
-    c.run(f"wget -O {zip_path} '{url}'")
-
-    print("🗃️ Unzipping archive into output_data/...")
-    c.run(f"unzip -o {zip_path} -d {dest_dir}")
-    c.run(f"rm {zip_path}")
-
-    print("✅ Results fetched and unzipped.")
-
-### CONTAINER OPERATIONS
-@task
-def container_build(c):
-    """
-    Build the Docker image from the Dockerfile in the project root.
-    """
-    print("🐳 Building Docker image: autism_signature")
-    c.run("docker build -t autism_signature .")
-
-@task
-def container_archive(c, image="autism_signature", output="autism_signature.tar.gz"):
-    """
-    Save the Docker image to a compressed archive for Zenodo or transport.
-    """
-    print(f"📦 Archiving Docker image '{image}' to {output}...")
-    c.run(f"docker save {image} | gzip > {output}")
-    print("🪦 Archive complete.")
-
-@task
-def container_setup(c, url="https://zenodo.org/record/15192559/files/autism-signature.tar.gz", output="autism-signature.tar.gz"):
-    """
-    Download and load the prebuilt Docker image from Zenodo.
-    """
-    if not os.path.exists(output):
-        print(f"📥 Downloading container from {url}...")
-        c.run(f"wget -O {output} '{url}'")
-    else:
-        print(f"📦 Container archive already exists: {output}")
-
-    print("🐳 Loading Docker image...")
-    c.run(f"gunzip -c {output} | docker load")
-
-    print("✨ Container setup complete.")
+    fetch_from_zenodo(c, name="results")
 
 ### RUN ANALYSES
 @task
@@ -219,25 +129,19 @@ def run_figures(c):
     print("🎉 Figure notebooks processed.")
 
 ### CLEANING
-def _clean(dir_name):
-    if os.path.exists(dir_name):
-        shutil.rmtree(dir_name)
-        print(f"💥 Removed {dir_name} and all its contents.")
-    else:
-        print(f"🫧 No {dir_name} folder to remove.")
 @task
 def clean_discovery(c):
     """
     Remove the entire output_data/Discovery folder and its contents.
     """
-    _clean("output_data/Discovery")
+    clean_folder("output_data/Discovery")
 
 @task
 def clean_figures(c):
     """
     Remove the entire output_data/Figures folder and its contents.
     """
-    _clean("output_data/Figures")
+    clean_folder("output_data/Figures")
 
 
 
