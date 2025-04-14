@@ -1,4 +1,5 @@
 import os
+import shutil
 from invoke import task, Context
 
 ## SET UP ENVIRONMENT

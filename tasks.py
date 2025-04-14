@@ -11,6 +11,7 @@ from tasks_utils import (
     container_setup,
     container_run,
     fetch_from_zenodo,
+    run_figures
 )
 
 @task
@@ -97,36 +98,6 @@ def run_discovery(c, output_dir="./output_data/Discovery", network=None, replica
                 f"{rep_id} {rep_id} {net_id} {working_dir} {container_output_dir} {debug_flag}"
             )
             c.run(cmd)
-
-@task
-def run_figures(c):
-    """
-    Run figure notebooks in code/figures/, skipping any that have already been executed.
-    Assumes each notebook has an output folder under output_data/figures/{notebook_stem}.
-    """
-    import pathlib
-
-    notebooks_dir = pathlib.Path("code/figures")
-    output_base = pathlib.Path("output_data/Figures")
-
-    notebooks = sorted(notebooks_dir.glob("*.ipynb"))
-
-    if not notebooks:
-        print("⚠️ No notebooks found in code/figures/")
-        return
-
-    for nb in notebooks:
-        fig_name = nb.stem
-        fig_output_dir = output_base / fig_name
-
-        if fig_output_dir.exists():
-            print(f"✅ Skipping {nb.name} (output exists)")
-            continue
-
-        print(f"📈 Running {nb.name}...")
-        c.run(f"jupyter nbconvert --to notebook --execute --inplace {nb}")
-
-    print("🎉 Figure notebooks processed.")
 
 ### CLEANING
 @task
