@@ -1,37 +1,52 @@
 # Hien Nguyen, 2019
 # https://hiendn.github.io/
 
-# Set working directory
-setwd("")
+# Argument parsing (source fMRI directory and result directory for the discovery script)
+args <- commandArgs(trailingOnly = TRUE)
+
+# Defaults if no arguments (for interactive use)
+source_dir <- ifelse(length(args) >= 1, args[1], "source_data/Data")
+discovery_dir <- ifelse(length(args) >= 2, args[2], "output_data/Discovery")
+Debug.Flag <- ifelse(length(args) >= 3, args[3] == "TRUE", FALSE)
+cat("💾 Writing outputs to:", discovery_dir, "\n")
 
 # Load phenotypes
-phenos <- read.delim("ABIDE1_Pheno_PSM_matched.tsv")
+phenos <- read.delim(file.path(source_dir, "ABIDE1_Pheno_PSM_matched.tsv"))
+# Reduce data size for debugging
+if (Debug.Flag) {
+  cat("⚠️  DEBUG MODE ACTIVE: limiting phenos to 20 rows\n"); flush.console()
+  phenos <- phenos[1:20, ]
+}
+
 classes_var <- ifelse(phenos$DX_GROUP == "Control", 0, 1)
 
 #################################################################
 ##                     Read Bootstrap P-values                 ##
 #################################################################
 
+# Find available replicates in discovery_dir
+result_files <- list.files(discovery_dir, pattern="Results_Instance_\\d+_Network_1.csv", full.names=TRUE)
+available_reps <- sort(as.integer(gsub(".*Results_Instance_(\\d+)_Network_1.csv", "\\1", result_files)))
+
 # Make storage list
 Replicate_list <- list()
 
-for (Replicate in 1:100) {
+for (Replicate in available_reps) {
 
   # Initialize an array for the results
   Results_array <- array(NA,
                          c(dim(phenos)[1],4,18))
 
   for (Network in 1:18) {
-    # Read from file
-    Read_file <- read.csv(paste('Results_Instance_',Replicate,'_Network_',Network,'.csv',sep = ''),
-                          header = TRUE)
-
-    # Store file to array
-    Results_array[,,Network] <- as.matrix(Read_file[,2:5])
+      file_path <- file.path(discovery_dir, sprintf("Results_Instance_%d_Network_%d.csv", Replicate, Network))
+      if (file.exists(file_path)) {
+          Read_file <- read.csv(file_path)
+          Results_array[, , Network] <- as.matrix(Read_file[, 2:5])
+      }
   }
 
   # Put array in list
-  Replicate_list[[Replicate]] <- Results_array
+  Replicate_list[[length(Replicate_list)+1]] <- Results_array
 }
 
 #################################################################
@@ -51,13 +66,14 @@ Subnets_list[[7]] <- c(6,11,17)
 Subnets_list[[8]] <- 1:18
 Subnets_results_list <- list()
 # Loop over subnet
+n_reps <- length(Replicate_list)
 for (subnet in 1:length(Subnets_list)) {
 
   # Combine Conformal
   Combine0_mat <- matrix(NA,dim(phenos)[1],100)
   Combine1_mat <- matrix(NA,dim(phenos)[1],100)
   Combine_results_mat <- matrix(NA,100,3)
-  for (Replicate in 1:100) {
+  for (Replicate in 1:n_reps) {
     # If there is only one network in the group, just use the value of this network
     if (length(Subnets_list[[subnet]])==1) {
       Combine0_mat[,Replicate] <- Replicate_list[[Replicate]][,4,Subnets_list[[subnet]]]
@@ -75,11 +91,17 @@ for (subnet in 1:length(Subnets_list)) {
 
   Pvalue0_combine <- (2*Combine0_mat)^(1/2)
   Pvalue1_combine <- (2*Combine1_mat)^(1/2)
-  write.table(Pvalue0_combine, file=paste("combined_networks_", subnet, "_p0.tsv", sep=""), sep="\t")
-  write.table(Pvalue1_combine, file=paste("combined_networks_", subnet, "_p1.tsv", sep=""), sep="\t")
+  # Combined conformal outputs
+  output_comb_p0 <- file.path(discovery_dir, paste0("combined_networks_", subnet, "_p0.tsv"))
+  output_comb_p1 <- file.path(discovery_dir, paste0("combined_networks_", subnet, "_p1.tsv"))
+  cat("📝 Writing:", output_comb_p0, "\n")
+  cat("📝 Writing:", output_comb_p1, "\n")
+  write.table(Pvalue0_combine, file = output_comb_p0, sep = "\t")
+  write.table(Pvalue1_combine, file = output_comb_p1, sep = "\t")
+
 
   Signif <- 0.2
-  for (Replicate in 1:100)
+  for (Replicate in 1:n_reps)
   {
     # Take the first network for the current bootstrap because the subjects are the same across all networks
     # and we are only going to use this variable to determine the clinical label of individuals.
@@ -126,7 +148,7 @@ for (subnet in 1:(spl+1)) {
   Combine0_mat <- matrix(NA,dim(phenos)[1],100)
   Combine1_mat <- matrix(NA,dim(phenos)[1],100)
   Combine_results_mat <- matrix(NA,100,3)
-  for (Replicate in 1:100) {
+  for (Replicate in 1:n_reps) {
     # (bootstrap_train,bootstrap_test,p_values,p0_values)
     WORKING <- Replicate_list[[Replicate]][,,1]
     TestBootID_mat[, Replicate] <- WORKING[,2]
@@ -162,7 +184,11 @@ for (subnet in 1:(spl+1)) {
   }
   Pvalue0_combine <- (2*Combine0_mat)^(1/2)
   Pvalue1_combine <- (2*Combine1_mat)^(1/2)
-  write.table(Pvalue0_combine, file=paste("split_net_", subnet, "_p0.tsv", sep=""), sep="\t")
-  write.table(Pvalue1_combine, file=paste("split_net_", subnet, "_p1.tsv", sep=""), sep="\t")
-
+  # Split conformal outputs
+  output_split_p0 <- file.path(discovery_dir, paste0("split_net_", subnet, "_p0.tsv"))
+  output_split_p1 <- file.path(discovery_dir, paste0("split_net_", subnet, "_p1.tsv"))
+  cat("📝 Writing:", output_split_p0, "\n")
+  cat("📝 Writing:", output_split_p1, "\n")
+  write.table(Pvalue0_combine, file = output_split_p0, sep = "\t")
+  write.table(Pvalue1_combine, file = output_split_p1, sep = "\t")
 }

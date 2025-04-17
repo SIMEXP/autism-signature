@@ -5,11 +5,19 @@
 library(compiler)
 library(fastcluster)
 library(reticulate)
-use_python("")
 library(Rcpp)
 library(RcppArmadillo)
 library(Rfast)
 np <- import("numpy")
+
+# Argument parsing (source fMRI directory and result directory for the validation script)
+args <- commandArgs(trailingOnly = TRUE)
+
+# Defaults if no arguments (for interactive use)
+source_dir <- ifelse(length(args) >= 1, args[1], "source_data/Data")
+output_dir <- ifelse(length(args) >= 2, args[2], "output_data/Validation")
+Debug.Flag <- ifelse(length(args) >= 3, args[3] == "TRUE", FALSE)
+cat("💾 Writing outputs to:", output_dir, "\n")
 
 # Set Networks and such
 Replicate <- 1
@@ -18,13 +26,18 @@ Replicate <- 1
 enableJIT(3)
 
 # Load files
-seed_maps <- np$load("seed_maps_no_cereb.npy")
-phenos <- read.delim("ABIDE1_Pheno_PSM_matched.tsv")
-seed_maps_val <- np$load("abide_2_seed_maps_no_cereb.npy")
-phenos_val <- read.delim("ABIDE2_Pheno_PSM_matched.tsv")
-output_directory <- ""
-if (!dir.exists(output_directory)) {
-  dir.create(output_directory, recursive = TRUE)
+seed_maps <- np$load(file.path(source_dir, "seed_maps_no_cereb.npy"))
+phenos <- read.delim(file.path(source_dir, "ABIDE1_Pheno_PSM_matched.tsv"))
+if (Debug.Flag) {
+  cat("⚠️  DEBUG MODE ACTIVE: limiting phenos to 20 rows\n"); flush.console()
+  phenos <- phenos[1:20, ]
+}
+
+seed_maps_val <- np$load(file.path(source_dir, "abide_2_seed_maps_no_cereb.npy"))
+phenos_val <- read.delim(file.path(source_dir, "ABIDE2_Pheno_PSM_matched.tsv"))
+if (Debug.Flag) {
+  cat("⚠️  DEBUG MODE ACTIVE: limiting phenos_val to 20 rows\n"); flush.console()
+  phenos_val <- phenos_val[1:20, ]
 }
 
 # Generate a bootstrap training sample
@@ -115,7 +128,9 @@ for (Network in 1:18) {
     print(c(Network,i_test,p_values[i_test],p0_values[i_test],proc.time()-tick))
   }
   # Write out results (train labs, test labs, p_values, 1-confidence)
+  output_file <- file.path(output_dir, paste('Results_Real_Network_',Network,'.csv',sep = ''))
+  cat("📝 Writing:", output_file, "\n")
   write.csv(cbind(bootstrap_train,bootstrap_test,p_values,p0_values),
-            file = file.path(output_directory,paste('Results_Real_Network_',Network,'.csv',sep = '')))
+            file = output_file)
 
 }

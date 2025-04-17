@@ -4,11 +4,15 @@ container_image: autism_signature
 # Code folder
 code_dir: code
 
-# Data folders
+# source data folders
 source_data_dir: source_data
+source_fmri_dir: source_data/Data
+
+# output data folders
 output_data_dir: output_data
 output_discovery: output_data/Discovery
-figures_dir: output_data/Figures
+output_validation: output_data/Validation
+figures_dir: output_data/Figures # This one is special, it's used in the run-figures task
 
 # Optional:
 # Zenodo data sources
