@@ -12,9 +12,10 @@ source_fmri_dir: source_data/Data
 output_data_dir: output_data
 output_discovery: output_data/Discovery
 output_validation: output_data/Validation
+output_null: output_data/Null
 figures_dir: output_data/Figures # This one is special, it's used in the run-figures task
+supplemental_figures_dir: output_data/Supplemental # This one is special, it's used in the run-supplemental task
 
-# Optional:
 # Zenodo data sources
 fetch_zenodo:
   atlas:
@@ -32,6 +33,11 @@ fetch_zenodo:
     dest: output_data/Results
     zip: output_data/Results.zip
 
+  container:
+    url: https://zenodo.org/records/15192559/files/Container.zip?download=1
+    dest: autism_signature.tar.gz
+    zip: Container.zip
+
 # Optional:
 # archive URL for the docker archive
 # this needs to be manually specified.
@@ -39,3 +45,4 @@ container_archive: https://zenodo.org/record/XXXXXXX/files/autism_signature.tar.
 
 # notebook dir if reused
 notebooks_dir: code/figures
+supplemental_notebooks_dir: code/supplemental

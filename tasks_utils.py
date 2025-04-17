@@ -138,15 +138,15 @@ def fetch_from_zenodo(c, name=None):
 
 ### Analyses
 @task
-def run_figures(c):
+def run_figures(c, notebooks_path=None, figures_base=None):
     """
     Run figure notebooks, skipping any that already have output folders.
     Notebooks directory and output location pulled from invoke.yaml.
     """
     import pathlib
 
-    notebooks_path = pathlib.Path(c.config.get("notebooks_dir", "code/figures"))
-    figures_base = pathlib.Path(c.config.get("figures_dir", "output_data/Figures"))
+    notebooks_path = notebooks_path or lib.Path(c.config.get("notebooks_dir", "code/figures"))
+    figures_base = figures_base or pathlib.Path(c.config.get("figures_dir", "output_data/Figures"))
 
     if not notebooks_path.exists():
         print(f"⚠️ Notebooks directory not found: {notebooks_path}")

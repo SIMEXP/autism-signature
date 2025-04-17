@@ -39,7 +39,7 @@ def setup_env_r(c):
         f'renv::restore(lockfile = \'{lockfile_path}\', library = \'{lib_path}\')"'
     )
 
-### FETCH SOURCE DATA
+### FETCH DATA
 @task
 def fetch_atlas(c):
     fetch_from_zenodo(c, name="atlas")
@@ -48,17 +48,20 @@ def fetch_atlas(c):
 def fetch_fmri(c):
     fetch_from_zenodo(c, name="fmri")
 
-@task(pre=[fetch_atlas, fetch_fmri])
-def setup_source_data(c):
-    """
-    Fetch all source data (atlases + fMRI) and unzip it under source_data/.
-    """
-    print("✨ All source data ready.")
-
-### FETCH OUTPUT_DATA
 @task
-def fetch_results(c):
+def fetch_old_results(c):
     fetch_from_zenodo(c, name="results")
+
+@task
+def fetch_container(c):
+    fetch_container(c, name="container")
+
+@task(pre=[fetch_atlas, fetch_fmri, fetch_old_results])
+def fetch_all(c):
+    """
+    Fetch all data assets.
+    """
+    print("✨ All data assets ready.")
 
 ### RUN ANALYSES
 @task
@@ -172,6 +175,35 @@ def run_validation_read(c, debug=False):
     c.run(cmd)
     print("🎯 Split score table created.")
 
+@task run_supplemental(c):
+    run_figures(c, c.config.get("supplemental_notebooks_dir"), c.config.get("supplemental_figures_dir"))
+@task
+def run_all(c, smoke_test=False):
+    """
+    Run all analyses
+    Use --parallel to enable parallel execution with xargs.
+    Use --smoke-test to run a short smoke test (1 replication with 20 subjects)
+    """
+    if smoke_test
+        print("🧨 Smoke test initiated: 1 replication across all 18 networks...")
+        flag_smoke_test=" --debug"
+    else:
+        print("🧨 Full replication run initiated (this is going to take a while!):")
+        flag_smoke_test=""
+    for net in range(18):
+        if smoke_test:
+            c.run(f"invoke run-discovery --replication=1 --network={net} --debug")
+        else:
+            c.run(f"invoke run-discovery")
+    c.run(f"invoke run-scores{flag_smoke_test}")
+    c.run(f"invoke run-validation{flag_smoke_test}")
+    c.run(f"invoke run-validation-read{flag_smoke_test}")
+    c.run(f"invoke run-null{flag_smoke_test}")
+    if smoke_test:
+        print("🖤 Smoke test complete.")
+    else:
+        print("🖤🖤🖤 Full replication complete.")
+
 ### CLEANING
 @task
 def clean_discovery(c):
@@ -194,31 +226,9 @@ def clean_figures(c):
     """
     clean_folder(c.config.get("figures_dir", "output_data/Figures"))
 
-
-### REPRODUCTION
 @task
-def run_all(c, parallel=False, n_jobs=6):
+def clean_supplemental(c):
     """
-    Run everything
+    Remove the entire output_data/Supplemental folder and its contents.
     """
-    print("🧨 Full replication run initiated (this is going to take a while!):")
-    c.run(f"invoke run-discovery")
-    c.run(f"invoke run-scores")
-    print("🖤 Run complete.")
-
-@task
-def run_all_test(c, parallel=False, n_jobs=6):
-    """
-    Run smoke test: 1 replication across all 18 networks.
-    Use --parallel to enable parallel execution with xargs.
-    """
-    print("🧨 Smoke test initiated: 1 replication across all 18 networks...")
-    if parallel:
-        print(f"⚙️  Running in parallel across {n_jobs} jobs...")
-        cmd = f"seq 0 17 | xargs -P {n_jobs} -I {{}} invoke run-discovery --replication=1 --network={{}} --debug"
-        c.run(cmd, pty=True)
-    else:
-        for net in range(18):
-            c.run(f"invoke run-discovery --replication=1 --network={net} --debug")
-    c.run(f"invoke run-scores")
-    print("🖤 Smoke test complete.")
+    clean_folder(c.config.get("supplemental_dir", "output_data/Supplemental"))
