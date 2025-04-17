@@ -1,11 +1,23 @@
 # Hien Nguyen, 2019
 # https://hiendn.github.io/
 
-# Set working directory
-setwd("")
+# Argument parsing (source fMRI directory and result directory for the validation script)
+args <- commandArgs(trailingOnly = TRUE)
+
+# Defaults if no arguments (for interactive use)
+source_dir <- ifelse(length(args) >= 1, args[1], "source_data/Data")
+validation_dir <- ifelse(length(args) >= 3, args[3], "output_data/Validation")
+Debug.Flag <- ifelse(length(args) >= 4, args[4] == "TRUE", FALSE)
+cat("💾 Reading source data from:", source_dir, "\n")
+cat("💾 Writing outputs to:", validation_dir, "\n")
 
 # Load phenotypes
-phenos <- read.delim("ABIDE2_Pheno_PSM_matched.tsv")
+phenos <- read.delim(file.path(source_dir, "ABIDE2_Pheno_PSM_matched.tsv"))
+# Reduce data size for debugging
+if (Debug.Flag) {
+  cat("⚠️  DEBUG MODE ACTIVE: limiting phenos to 20 rows\n"); flush.console()
+  phenos <- phenos[1:20, ]
+}
 classes_var <- ifelse(phenos$DX_GROUP == "Control", 0, 1)
 
 # Initialize an array for the results
@@ -14,7 +26,7 @@ Results_array <- array(NA,
 
 for (Network in 1:18) {
   # Read from file
-  Read_file <- read.csv(paste('Results_Real_Network_',Network,'.csv',sep = ''),
+  Read_file <- read.csv(file.path(validation_dir, paste('Results_Real_Network_',Network,'.csv',sep = '')),
                         header = TRUE)
 
   # Store file to array
@@ -112,12 +124,31 @@ for (spl in 1:6) {
       }
     Split_array[,2,subnet] <- (2*Combine0_mat)^(1/2)
     Split_array[,1,subnet] <- (2*Combine1_mat)^(1/2)
-    write.table(Split_array[,,subnet], file=paste("validation_net_split_", spl, "_model_", subnet, "_combined_p_values.tsv", sep=""), sep="\t")
+    # 📣 Construct output path
+    output_file <- file.path(
+      validation_dir,
+      paste0("validation_net_split_", spl, "_model_", subnet, "_combined_p_values.tsv")
+    )
+
+    # 🔍 Announce to the void
+    cat("📝 Writing split model output to:", output_file, "\n"); flush.console()
+
+    # 💾 Save the results
+    write.table(
+      Split_array[,,subnet],
+      file = output_file,
+      sep = "\t"
+    )
   }
   Split_results_list[[spl]] <- Split_array
 }
 
 # Save two particular models to csv
 # DIM is (N_subjects x 2) with (P_label_Autism, P_label_Control).
-write.table(Split_results_list[[1]][,,1], file="validation_net_split_1_model_1_combined_p_values.tsv", sep="\t")
-write.table(Split_results_list[[1]][,,2], file="validation_net_split_1_model_2_combined_p_values.tsv", sep="\t")
+# Split conformal outputs
+output_split_model1 <- file.path(validation_dir, "validation_net_split_1_model_1_combined_p_values.tsv")
+output_split_model2 <- file.path(validation_dir, "validation_net_split_1_model_2_combined_p_values.tsv")
+cat("📝 Writing:", output_split_model1, "\n")
+cat("📝 Writing:", output_split_model2, "\n")
+write.table(Split_results_list[[1]][,,1], file=output_split_model1, sep="\t")
+write.table(Split_results_list[[1]][,,2], file=output_split_model2, sep="\t")
