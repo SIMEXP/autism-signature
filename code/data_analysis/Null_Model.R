@@ -5,7 +5,6 @@
 library(compiler)
 library(fastcluster)
 library(reticulate)
-use_python("")
 library(Rcpp)
 library(RcppArmadillo)
 library(Rfast)
@@ -15,20 +14,28 @@ np <- import("numpy")
 args <- commandArgs(TRUE)
 Working_Directory <- args[1]
 Output_Directory <- args[2]
+Flag.Debug <- ifelse(length(args) >= 3 && args[3] == "TRUE", TRUE, FALSE)
 
 # Turn on JIT
 enableJIT(3)
 
-# Set working directory
-setwd(Working_Directory)
-
 # Load files
-phenos <- read.delim("ABIDE1_Pheno_PSM_matched.tsv")
+phenos <- read.delim(file.path(Working_Directory, "ABIDE1_Pheno_PSM_matched.tsv"))
+# Apply debug mode if needed
+if (Flag.Debug) {
+  cat("⚠️ DEBUG MODE ACTIVE: limiting phenos to 20 rows\n"); flush.console()
+  phenos <- phenos[1:20, ]
+}
+
 # Get working frames
 regressed_vars <- as.matrix(cbind(1,phenos$AGE_AT_SCAN,phenos$fd_scrubbed))
 classes_var <- ifelse(phenos$DX_GROUP == "Control", 0, 1)
 
-for (Random.Seed in 1:100) {
+# Set number of replications
+n_seeds <- if (Flag.Debug) 1 else 100
+
+for (Random.Seed in 1:n_seeds) {
+  cat("🔁 Running bootstrap with seed:", Random.Seed, "\n")
   # Set a random seed
   set.seed(Random.Seed)
   # Generate a bootstrap training sample
@@ -79,6 +86,8 @@ for (Random.Seed in 1:100) {
     #print(c(Network,i_test,p_values[i_test],p0_values[i_test],proc.time()-tick))
   }
   # Write out results (train labs, test labs, p_values, 1-confidence)
-  write.csv(cbind(bootstrap_train,bootstrap_test,p_values,p0_values),
-            file = file.path(Output_Directory, paste('Results_Instance_',Random.Seed,'_NULL_Model_age_fd.csv',sep = '')))
+  # Output
+  output_file <- file.path(Output_Directory, paste("Results_Instance_", Random.Seed, "_NULL_Model_age_fd.csv", sep = ''))
+  cat("💾 Writing output to:", output_file, "\n")
+  write.csv(cbind(bootstrap_train, bootstrap_test, p_values, p0_values), file = output_file)
 }

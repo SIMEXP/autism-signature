@@ -2,7 +2,7 @@ import os
 import shutil
 from invoke import task, Context
 
-## SET UP ENVIRONMENT
+## SET UP
 @task
 def setup_env_python(c, reqs="requirements.txt"):
     """
@@ -26,7 +26,7 @@ def clean_folder(dir_name, label=None):
     else:
         print(f"🫧 Nothing to clean: {label}")
 
-### Container tasks
+### CONTAINER
 def _set_image(c, image=None):
     """
     Resolve the Docker image name from parameter or invoke.yaml.

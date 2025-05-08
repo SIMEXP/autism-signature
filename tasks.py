@@ -3,6 +3,7 @@ import os
 import shutil
 import glob
 import sys
+from pathlib import Path
 import random
 from tasks_utils import (
     clean_folder,
@@ -38,6 +39,15 @@ def setup_env_r(c):
         f'Rscript -e ".libPaths(\'{lib_path}\'); '
         f'renv::restore(lockfile = \'{lockfile_path}\', library = \'{lib_path}\')"'
     )
+
+@task
+def setup_all(c):
+    """
+    Setup all the requirements.
+    """
+    setup_env_r(c)
+    setup_env_python(c)
+    print(f"✨ Setup complete!")
 
 ### FETCH DATA
 @task
@@ -175,8 +185,34 @@ def run_validation_read(c, debug=False):
     c.run(cmd)
     print("🎯 Split score table created.")
 
-@task run_supplemental(c):
-    run_figures(c, c.config.get("supplemental_notebooks_dir"), c.config.get("supplemental_figures_dir"))
+@task
+def run_null(c, output_dir=None, debug=False):
+    """
+    Run Validation_Conformal_Score.R to validate discovery results.
+    """
+    import os
+
+    source_dir = c.config.get("source_fmri_dir", "source_data/Data")
+    output_dir = output_dir or c.config.get("output_null", "output_data/Null")
+    debug_flag = "TRUE" if debug else "FALSE"
+    os.makedirs(output_dir, exist_ok=True)
+
+    real_results = glob.glob(os.path.join(output_dir, "Results_Instance_*.csv"))
+    if real_results:
+        print(f"🧠 Found {len(real_results)} existing 'real' results. Skipping.")
+        return
+
+    print(f"🔎 Running null permutation experiments (debug mode: {debug_flag})...")
+    cmd = f"Rscript code/data_analysis/Null_Model.R {source_dir} {output_dir} {debug_flag}"
+    c.run(cmd)
+    print("🎯 Null experiments complete.")
+
+@task
+def run_supplemental(c):
+    notebooks_dir = Path(c.config.get("supplemental_notebooks_dir"))
+    figures_dir = Path(c.config.get("supplemental_figures_dir"))
+    run_figures(c, notebooks_dir, figures_dir)
+
 @task
 def run_all(c, smoke_test=False):
     """
@@ -184,7 +220,7 @@ def run_all(c, smoke_test=False):
     Use --parallel to enable parallel execution with xargs.
     Use --smoke-test to run a short smoke test (1 replication with 20 subjects)
     """
-    if smoke_test
+    if smoke_test:
         print("🧨 Smoke test initiated: 1 replication across all 18 networks...")
         flag_smoke_test=" --debug"
     else:
@@ -218,6 +254,13 @@ def clean_validation(c):
     Remove the entire output_data/Validation folder and its contents.
     """
     clean_folder(c.config.get("output_validation", "output_data/Validation"))
+
+@task
+def clean_null(c):
+    """
+    Remove the entire output_data/Null folder and its contents.
+    """
+    clean_folder(c.config.get("output_null", "output_data/Null"))
 
 @task
 def clean_figures(c):
