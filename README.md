@@ -33,6 +33,9 @@ This:
 **Note:**
 This task assumes an Ubuntu-like operating system. You will still need to have a number of dependencies installed, such as R and Python. Check the Docker build file (`Dockerfile`) for more info on installing all required dependencies.
 
+**Note 2:**
+You can skip this step if you choose to run the analysis in a docker container, provided you have docker installed and complete the following steps using invoke.
+ 
 ---
 
 ### 2️⃣ Fetch Data & Results
