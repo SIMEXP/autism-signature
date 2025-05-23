@@ -7,10 +7,11 @@ from pathlib import Path
 import random
 from tasks_utils import (
     clean_folder,
-    container_build,
-    container_archive,
-    container_setup,
-    container_run,
+    docker_build,
+    docker_archive,
+    docker_setup,
+    docker_run,
+    apptainer_run,
     fetch_from_zenodo,
     run_figures
 )
@@ -63,10 +64,10 @@ def fetch_old_results(c):
     fetch_from_zenodo(c, name="results")
 
 @task
-def fetch_container(c):
-    fetch_from_zenodo(c, name="container")
+def fetch_docker(c):
+    fetch_from_zenodo(c, name="docker")
 
-@task(pre=[fetch_atlas, fetch_fmri, fetch_old_results, fetch_container])
+@task(pre=[fetch_atlas, fetch_fmri, fetch_old_results, fetch_docker])
 def fetch_all(c):
     """
     Fetch all data assets.
@@ -85,7 +86,7 @@ def run_discovery(c, network, replication, debug=False):
         debug (bool): set TRUE to enable debugging behavior in R script
     """
     # Config-driven paths
-    output_dir = c.config.get("output_discovery", "output_data/Discovery")
+    output_dir = os.path.relpath(c.config.get("output_discovery", "output_data/Discovery"))
     working_dir = c.config.get("source_fmri_dir", "source_data/Data")
     debug_flag = "TRUE" if debug else "FALSE"
 
@@ -107,7 +108,7 @@ def run_discovery(c, network, replication, debug=False):
     print(f"🔮 Running replicate {rep}, network {net}")
     cmd = (
         f"Rscript code/data_analysis/discovery_conformal_score.R "
-        f"{rep} {rep} {net} {working_dir} {output_dir} {debug_flag}"
+        f"{rep} {rep} {net} {working_dir} ./{output_dir} {debug_flag}"
     )
     c.run(cmd)
 
@@ -300,3 +301,10 @@ def clean_supplemental(c):
     Remove the entire output_data/Supplemental folder and its contents.
     """
     clean_folder(c.config.get("supplemental_dir", "output_data/Supplemental"))
+
+@task(pre=[clean_discovery, clean_validation, clean_null, clean_figures, clean_supplemental])
+def clean_all(c):
+    """
+    Clean all outputs
+    """
+    print("✨ All output data assets have been cleaned.")

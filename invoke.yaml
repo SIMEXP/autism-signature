@@ -1,5 +1,5 @@
 # invoke.yaml
-container_image: autism_signature
+docker_image: autism_signature
 
 # Code folder
 code_dir: code
@@ -37,6 +37,6 @@ fetch_zenodo:
     dest: output_data/
     archive: output_data/Results.zip
 
-  container:
+  docker:
     url: https://zenodo.org/records/15375152/files/autism_signature.tar.gz?download=1
     archive: ./autism_signature.tar.gz

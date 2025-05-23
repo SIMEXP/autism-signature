@@ -83,17 +83,17 @@ invoke clean-all
 
 ---
 
-## 🛣️ Using the Container
+## 🛣️ Using the docker Container
 
 To run tasks **inside the Docker container** (here using 4 threads):
 
 ```bash
-invoke container-run --task run-all --args "--threads=4"
+invoke docker-run --task run-all --args "--threads=4"
 ```
 
 You will need docker installed for this to work though. This ensures the entire environment (Python, R, deps) is fully controlled. If you use that route, you are not required to complete `invoke setup-all`. The container image includes a snapshot of all the required dependencies, starting with a jupyter notebook docker stack image. To run a smoke test inside the container:
 ```bash
-invoke container-run --task run-all --args "--threads=4 --smoke-test"
+invoke docker-run --task run-all --args "--threads=4 --smoke-test"
 ```
 
 

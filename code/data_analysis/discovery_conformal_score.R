@@ -19,16 +19,20 @@ Working_Directory <- args[4]
 Output_Directory <- args[5]
 Debug.Flag <- ifelse(length(args) >= 6, args[6] == "TRUE", FALSE)
 
+# Limit internal threading to 1 to avoid nested parallelism
+Sys.setenv(OMP_NUM_THREADS = "1")
+Sys.setenv(MKL_NUM_THREADS = "1")
+Sys.setenv(RCPP_PARALLEL_NUM_THREADS = "1")
+Sys.setenv(OPENBLAS_NUM_THREADS = "1")
+Sys.setenv(NUMEXPR_NUM_THREADS = "1")  # In case NumPy does spooky stuff
+
 # Turn on JIT
 enableJIT(3)
 
-# Set working directory
-setwd(Working_Directory)
-
 # Load files
 # Shape: (Subjects, Voxels, Networks)
-seed_maps <- np$load("seed_maps_no_cereb.npy")
-phenos <- read.delim("ABIDE1_Pheno_PSM_matched.tsv")
+seed_maps <- np$load(file.path(Working_Directory, "seed_maps_no_cereb.npy"), mmap_mode=NULL)
+phenos <- read.delim(file.path(Working_Directory, "ABIDE1_Pheno_PSM_matched.tsv"))
 
 # Reduce data size for debugging
 if (Debug.Flag) {

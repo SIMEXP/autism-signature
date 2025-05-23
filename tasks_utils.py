@@ -34,13 +34,13 @@ def _set_image(c, image=None):
     """
     Resolve the Docker image name from parameter or invoke.yaml.
     """
-    image = image or c.config.get("container_image")
+    image = image or c.config.get("docker_image")
     if not image:
-        raise ValueError("No Docker image specified. Please set container_image in invoke.yaml or pass it explicitly.")
+        raise ValueError("No Docker image specified. Please set docker_image in invoke.yaml or pass it explicitly.")
     return image
 
 @task
-def container_build(c, image=None):
+def docker_build(c, image=None):
     """
     Build the Docker image from the Dockerfile in the project root.
     """
@@ -49,7 +49,7 @@ def container_build(c, image=None):
     c.run(f"docker build -t {image} .")
 
 @task
-def container_archive(c, image=None):
+def docker_archive(c, image=None):
     """
     Save the Docker image to a compressed archive for Zenodo or transport.
     """
@@ -60,15 +60,15 @@ def container_archive(c, image=None):
     print("🪦 Archive complete.")
 
 @task
-def container_setup(c, url=None, image=None):
+def docker_setup(c, url=None, image=None):
     """
     Download and load the prebuilt Docker image from Zenodo.
     """
     image = _set_image(c, image)
     if not url:
-        url = c.config.get("container_archive")
+        url = c.config.get("docker_archive")
         if not url:
-            raise ValueError("No archive URL provided. Set container_archive in invoke.yaml or pass --url.")
+            raise ValueError("No archive URL provided. Set docker_archive in invoke.yaml or pass --url.")
 
     output = f"{image}.tar.gz"
     if not os.path.exists(output):
@@ -113,7 +113,7 @@ def _ensure_docker_image_loaded(c, image, image_tar):
         raise ValueError("❌ Unsupported container format. Use .tar or .tar.gz")
 
 @task
-def container_run(c, task, args=""):
+def docker_run(c, task, args=""):
     """
     Run an invoke task inside the Docker container.
 
@@ -121,7 +121,7 @@ def container_run(c, task, args=""):
         task (str): the invoke task to run
         args (str): any additional CLI args to pass to the task
     """
-    image = c.config.get("container_image")
+    image = c.config.get("docker_image")
     image_tar = f"{image}.tar.gz"
 
     _ensure_docker_image_loaded(c, image, image_tar)
@@ -133,6 +133,52 @@ def container_run(c, task, args=""):
 
     print(f"🐳 Running inside container: {cmd}")
     c.run(docker_cmd)
+
+## Apptainer
+def _ensure_apptainer_image_exists(c, image_path, docker_image):
+    """
+    Ensure the specified Apptainer image exists. If not, try to convert from Docker.
+    """
+    if not shutil.which("apptainer"):
+        raise RuntimeError("❌ Apptainer is not installed or not in PATH. Please install Apptainer.")
+
+    image_path = Path(image_path)
+    if image_path.exists():
+        return  # Image already exists
+
+    print(f"📦 Apptainer image not found at {image_path}. Attempting to build from Docker image '{docker_image}'...")
+
+    if not shutil.which("docker"):
+        raise RuntimeError("❌ Docker is required to convert image but is not installed or not in PATH.")
+
+    # Ensure Docker image is loaded first
+    image_tar = f"{docker_image}.tar.gz"
+    _ensure_docker_image_loaded(c, docker_image, image_tar)
+
+    # Convert to Apptainer image
+    c.run(f"apptainer build {image_path} docker-daemon://{docker_image}")
+
+@task
+def apptainer_run(c, task, args=""):
+    """
+    Run an invoke task inside the Apptainer container.
+
+    Args:
+        task (str): the invoke task to run
+        args (str): any additional CLI args to pass to the task
+    """
+    docker_image = c.config.get("container_image")
+    apptainer_image = f"{docker_image}.sif"
+
+    _ensure_apptainer_image_exists(c, apptainer_image, docker_image)
+
+    hostdir = os.getcwd()
+    workdir = "/home/jovyan/work"
+    cmd = f"invoke {task} {args}"
+    apptainer_cmd = f"apptainer exec --bind {hostdir}:{workdir} {apptainer_image} {cmd}"
+
+    print(f"🧪 Running inside Apptainer: {cmd}")
+    c.run(apptainer_cmd)
 
 ## Fetch data from zenodo
 @task
