@@ -40,3 +40,7 @@ fetch_zenodo:
   docker:
     url: https://zenodo.org/records/15375152/files/autism_signature.tar.gz?download=1
     archive: ./autism_signature.tar.gz
+
+  apptainer:
+    url: https://zenodo.org/records/15375152/files/autism_signature.sif?download=1
+    archive: ./autism_signature.sif

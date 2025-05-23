@@ -11,7 +11,7 @@ from tasks_utils import (
     docker_archive,
     docker_setup,
     docker_run,
-    apptainer_archive, 
+    apptainer_archive,
     apptainer_run,
     fetch_from_zenodo,
     run_figures
@@ -68,7 +68,11 @@ def fetch_old_results(c):
 def fetch_docker(c):
     fetch_from_zenodo(c, name="docker")
 
-@task(pre=[fetch_atlas, fetch_fmri, fetch_old_results, fetch_docker])
+@task
+def fetch_apptainer(c):
+    fetch_from_zenodo(c, name="apptainer")
+
+@task(pre=[fetch_atlas, fetch_fmri, fetch_old_results, fetch_docker, fetch_apptainer])
 def fetch_all(c):
     """
     Fetch all data assets.
