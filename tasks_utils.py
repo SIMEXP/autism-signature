@@ -1,6 +1,9 @@
 import os
 import shutil
 from invoke import task, Context
+import tempfile
+import gzip
+from pathlib import Path
 
 ## SET UP
 @task
@@ -79,6 +82,36 @@ def container_setup(c, url=None, image=None):
 
     print("✨ Container setup complete.")
 
+def _ensure_docker_image_loaded(c, image, image_tar):
+    """
+    Ensure the specified Docker image is available. If not, try to load it from a .tar or .tar.gz.
+    """
+    if not shutil.which("docker"):
+        raise RuntimeError("❌ Docker is not installed or not in PATH. Please install Docker.")
+
+    result = c.run(f"docker images -q {image}", hide=True, warn=True)
+    if result.stdout.strip():
+        return  # Image already present
+
+    print(f"📦 Docker image '{image}' not found. Attempting to load from {image_tar}...")
+
+    image_tar = Path(image_tar)
+    if not image_tar.exists():
+        raise FileNotFoundError(f"❌ Docker image file not found: {image_tar}")
+
+    if image_tar.suffixes[-2:] == ['.tar', '.gz']:
+        print(f"🗜️ Extracting {image_tar}...")
+        with tempfile.NamedTemporaryFile(suffix=".tar", delete=False) as temp_tar:
+            with gzip.open(image_tar, "rb") as f_in:
+                shutil.copyfileobj(f_in, temp_tar)
+            temp_tar_path = temp_tar.name
+        c.run(f"docker load -i {temp_tar_path}")
+        os.remove(temp_tar_path)
+    elif image_tar.suffix == ".tar":
+        c.run(f"docker load -i {image_tar}")
+    else:
+        raise ValueError("❌ Unsupported container format. Use .tar or .tar.gz")
+
 @task
 def container_run(c, task, args=""):
     """
@@ -88,23 +121,31 @@ def container_run(c, task, args=""):
         task (str): the invoke task to run
         args (str): any additional CLI args to pass to the task
     """
-    image = c.config.get("container_image", "autism_signature")
+    image = c.config.get("container_image")
+    image_tar = f"{image}.tar.gz"
+
+    _ensure_docker_image_loaded(c, image, image_tar)
+
+    hostdir = os.getcwd()
+    workdir = "/home/jovyan/work"
     cmd = f"invoke {task} {args}"
-    docker_cmd = f'docker run --rm -v $PWD:/home/jovyan/work -w /home/jovyan/work {image} {cmd}'
-    Context().run(docker_cmd)
+    docker_cmd = f'docker run --rm -v {hostdir}:{workdir} -w {workdir} {image} {cmd}'
+
+    print(f"🐳 Running inside container: {cmd}")
+    c.run(docker_cmd)
 
 ## Fetch data from zenodo
 @task
 def fetch_from_zenodo(c, name=None):
     """
-    Generic fetch/unzip task using config.fetch_zenodo values.
+    Generic fetch/uncompress task using config.fetch_zenodo values.
 
     Expects invoke.yaml to have:
       fetch_zenodo:
         <name>:
           url: https://...
-          dest: path/to/final/dir
-          zip: path/to/temp.zip
+          dest: path/to/final/dir [optional: triggers extraction if set]
+          archive: path/to/downloaded/file (e.g. tmp/file.tar.gz or tmp/file.zip)
     """
     import os
 
@@ -113,28 +154,38 @@ def fetch_from_zenodo(c, name=None):
 
     conf = c.config.get("fetch_zenodo", {}).get(name)
     if not conf:
-        raise ValueError(f"No fetch_zenodo config found for '{name}'. Define it under 'fetch_zenodo' in invoke.yaml.")
+        raise ValueError(f"No fetch_zenodo config found for '{name}'.")
 
     url = conf.get("url")
-    dest_dir = conf.get("dest")
-    zip_path = conf.get("zip")
+    dest_dir = conf.get("dest")  # optional
+    archive_path = conf.get("archive")
 
-    if not url or not dest_dir or not zip_path:
-        raise ValueError(f"Missing url, dest, or zip in config for '{name}'.")
+    if not url or not archive_path:
+        raise ValueError(f"Missing url or archive path in config for '{name}'.")
 
-    if os.path.exists(dest_dir):
+    if dest_dir and os.path.exists(dest_dir):
         print(f"🧠 '{name}' already extracted at {dest_dir}")
         return
 
-    os.makedirs(os.path.dirname(zip_path), exist_ok=True)
+    os.makedirs(os.path.dirname(archive_path), exist_ok=True)
     print(f"📥 Downloading '{name}' from {url}...")
-    c.run(f"wget -O {zip_path} '{url}'")
+    c.run(f"wget -O {archive_path} '{url}'")
 
-    print(f"🗃️ Unzipping '{name}' to {dest_dir}...")
-    c.run(f"unzip {zip_path} -d {os.path.dirname(dest_dir)}")
-    c.run(f"rm {zip_path}")
+    if dest_dir:
+        os.makedirs(dest_dir, exist_ok=True)
+        print(f"🗃️ Extracting '{name}' to {dest_dir}...")
 
-    print(f"✅ Done fetching '{name}'")
+        if archive_path.endswith(".zip"):
+            c.run(f"unzip {archive_path} -d {dest_dir}")
+        elif archive_path.endswith(".tar.gz") or archive_path.endswith(".tgz"):
+            c.run(f"tar -xzf {archive_path} -C {dest_dir}")
+        else:
+            raise ValueError(f"Cannot extract archive format: {archive_path}")
+
+        c.run(f"rm {archive_path}")
+        print(f"✅ Done extracting '{name}'")
+    else:
+        print(f"📦 Downloaded raw archive for '{name}' to {archive_path} (no extraction)")
 
 ### Analyses
 @task

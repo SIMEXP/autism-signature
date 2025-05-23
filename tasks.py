@@ -64,9 +64,9 @@ def fetch_old_results(c):
 
 @task
 def fetch_container(c):
-    fetch_container(c, name="container")
+    fetch_from_zenodo(c, name="container")
 
-@task(pre=[fetch_atlas, fetch_fmri, fetch_old_results])
+@task(pre=[fetch_atlas, fetch_fmri, fetch_old_results, fetch_container])
 def fetch_all(c):
     """
     Fetch all data assets.
@@ -75,19 +75,19 @@ def fetch_all(c):
 
 ### RUN ANALYSES
 @task
-def run_discovery(c, output_dir=None, network=None, replication=None, debug=False):
+def run_discovery(c, network, replication, debug=False):
     """
     Run the discovery conformal score analysis for selected networks and replications.
 
     Args:
-        network (int): index of network to process using 0-indexing (default: all)
-        replication (int): index of bootstrap replication using 0-indexing (default: all 100)
+        network (int): index of network to process using 0-indexing
+        replication (int): index of bootstrap replication using 0-indexing
         debug (bool): set TRUE to enable debugging behavior in R script
     """
     import os
 
     # Config-driven paths
-    output_dir = output_dir or c.config.get("output_discovery", "output_data/Discovery")
+    output_dir = c.config.get("output_discovery", "output_data/Discovery")
     working_dir = c.config.get("source_fmri_dir", "source_data/Data")
     debug_flag = "TRUE" if debug else "FALSE"
 
@@ -97,26 +97,54 @@ def run_discovery(c, output_dir=None, network=None, replication=None, debug=Fals
 
     os.makedirs(output_dir, exist_ok=True)
 
-    list_replication = [int(replication)] if replication is not None else range(100)
-    list_network = [int(network)] if network is not None else range(18)
+    result_file = os.path.join(output_dir, f"Results_Instance_{replication + 1}_Network_{network + 1}.csv")
 
-    for n in list_network:
-        for r in list_replication:
-            net_id = n + 1  # cursed 1-indexing
-            rep_id = r + 1
-            container_output_dir = f"/home/jovyan/work/{os.path.relpath(output_dir)}"
-            result_file = os.path.join(output_dir, f"Results_Instance_{rep_id}_Network_{net_id}.csv")
+    if os.path.exists(result_file):
+        print(f"🟡 Skipping existing: {result_file}")
+        return
 
-            if os.path.exists(result_file):
-                print(f"🟡 Skipping existing: {result_file}")
-                continue
+    print(f"🔮 Running replicate {replication + 1}, network {network + 1}")
+    cmd = (
+        f"Rscript code/data_analysis/discovery_conformal_score.R "
+        f"{replication + 1} {replication + 1} {network + 1} {working_dir} {output_dir} {debug_flag}"
+    )
+    c.run(cmd)
 
-            print(f"🔮 Running replicate {rep_id}, network {net_id}")
-            cmd = (
-                f"Rscript code/data_analysis/discovery_conformal_score.R "
-                f"{rep_id} {rep_id} {net_id} {working_dir} {container_output_dir} {debug_flag}"
-            )
-            c.run(cmd)
+@task
+def run_discovery_all(c, threads=1, debug=False):
+    """
+    Run all discovery conformal score analyses (100 replications × 18 networks).
+    Runs in parallel using threads if threads > 1.
+
+    Args:
+        threads (int): number of threads to use (default: 1, i.e. serial execution)
+        debug (bool): enable debugging behavior in R script
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    debug_flag = "--debug" if debug else ""
+    if debug:
+        jobs = [(0, net) for net in range(18)]
+    else:
+        jobs = [(rep, net) for rep in range(100) for net in range(18)]
+
+    def run_single(rep_net):
+        rep, net = rep_net
+        c.run(f"invoke run-discovery --replication={rep} --network={net} {debug_flag}")
+
+    print(f"🧵 Launching discovery with {str(threads)} thread{'s' if threads != 1 else ''}...")
+
+    if threads == 1:
+        for job in jobs:
+            run_single(job)
+    else:
+        with ThreadPoolExecutor(max_workers=threads) as executor:
+            futures = [executor.submit(run_single, job) for job in jobs]
+            for future in as_completed(futures):
+                # fail loudly
+                future.result()
+
+    print("🖤 Full discovery run complete.")
 
 @task
 def run_scores(c, debug=False):
@@ -214,11 +242,11 @@ def run_supplemental(c):
     run_figures(c, notebooks_dir, figures_dir)
 
 @task
-def run_all(c, smoke_test=False):
+def run_all(c, smoke_test=False, threads=1):
     """
     Run all analyses
-    Use --parallel to enable parallel execution with xargs.
     Use --smoke-test to run a short smoke test (1 replication with 20 subjects)
+    Use --threads to specify the number of parallel threads (default 1)
     """
     if smoke_test:
         print("🧨 Smoke test initiated: 1 replication across all 18 networks...")
@@ -226,11 +254,7 @@ def run_all(c, smoke_test=False):
     else:
         print("🧨 Full replication run initiated (this is going to take a while!):")
         flag_smoke_test=""
-    for net in range(18):
-        if smoke_test:
-            c.run(f"invoke run-discovery --replication=1 --network={net} --debug")
-        else:
-            c.run(f"invoke run-discovery")
+    c.run(f"invoke run-discovery-all --threads={threads}{flag_smoke_test}")
     c.run(f"invoke run-scores{flag_smoke_test}")
     c.run(f"invoke run-validation{flag_smoke_test}")
     c.run(f"invoke run-validation-read{flag_smoke_test}")

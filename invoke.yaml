@@ -24,20 +24,19 @@ supplemental_figures_dir: output_data/Supplemental
 fetch_zenodo:
   atlas:
     url: https://zenodo.org/records/15192559/files/ATLAS.zip?download=1
-    dest: source_data/ATLAS
-    zip: source_data/ATLAS.zip
+    dest: source_data/
+    archive: source_data/ATLAS.zip
 
   fmri:
     url: https://zenodo.org/records/15192559/files/Data.zip?download=1
-    dest: source_data/Data
-    zip: source_data/Data.zip
+    dest: source_data/
+    archive: source_data/Data.zip
 
   results:
     url: https://zenodo.org/records/15192559/files/Results.zip?download=1
-    dest: output_data/Results
-    zip: output_data/Results.zip
+    dest: output_data/
+    archive: output_data/Results.zip
 
   container:
-    url: https://zenodo.org/records/15192559/files/Container.zip?download=1
-    dest: autism_signature.tar.gz
-    zip: Container.zip
+    url: https://zenodo.org/records/15375152/files/autism_signature.tar.gz?download=1
+    archive: ./autism_signature.tar.gz

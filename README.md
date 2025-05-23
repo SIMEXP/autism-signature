@@ -35,7 +35,7 @@ This task assumes an Ubuntu-like operating system. You will still need to have a
 
 **Note 2:**
 You can skip this step if you choose to run the analysis in a docker container, provided you have docker installed and complete the following steps using invoke.
- 
+
 ---
 
 ### 2️⃣ Fetch Data & Results
@@ -85,13 +85,17 @@ invoke clean-all
 
 ## 🛣️ Using the Container
 
-To run tasks **inside the Docker container**:
+To run tasks **inside the Docker container** (here using 4 threads):
 
 ```bash
-invoke container-run --task run-all
+invoke container-run --task run-all --args "--threads=4"
 ```
 
-This ensures the entire environment (Python, R, deps) is fully controlled. If you use that route, you are not required to complete `invoke setup-all`. The container image includes a snapshot of all the required dependencies, starting with a jupyter notebook docker stack image.
+You will need docker installed for this to work though. This ensures the entire environment (Python, R, deps) is fully controlled. If you use that route, you are not required to complete `invoke setup-all`. The container image includes a snapshot of all the required dependencies, starting with a jupyter notebook docker stack image. To run a smoke test inside the container:
+```bash
+invoke container-run --task run-all --args "--threads=4 --smoke-test"
+```
+
 
 ---
 
@@ -125,67 +129,5 @@ This ensures the entire environment (Python, R, deps) is fully controlled. If yo
 ```bash
 invoke setup-all
 invoke fetch-all
-invoke container-run --task run-all -- --smoke-test
+invoke container-run --task run-all --args "--smoke-test --threads=4"
 ```
-
-# Old README
-
-## Steps to reproduce the analysis
-### Data
-The study uses data from ABIDE 1 and 2 datasets. Participants were matched using propensity score matching, which was completed as part of a separate project - the scripts are here (LINK).
-Resting state functional connectivity data was preprocessed using NIAK, described in the paper. This study uses the seed maps.
-Using the following scripts the full analysis can be reproduced. Alternatively, to skip the data analysis part and recreate the figures, download all results data from (LINK).
-
-### Data analysis
-These steps were run on the Alliance Canada Beluga server. Download the data from (LINK) and update the paths and slurm preamble.
-
-On an HPC server, first set up the R environment. After cloning the repository:
-1. Open R in the project directory
-2. ```R install.packages("renv") renv::restore() ```
-
-For scripts 1-5 do:
-```
-python -m venv hpc_py11_env
-source hpc_py11_env/bin/activate
-pip install -r environments/requirements_py11.txt
-```
-
-Run:
-1. `Discovery_Conformal_Score.R` using `submit_discovery.sh`
-2. `Discovery_Read_Conformal_Scores.R`
-3. `Validation_Conformal_Score_Boot.R` using `submit_validation.sh`
-4. `Validation_Read_Conformal_Scores.R`
-5. `Null_Model.R` using `submit_null.sh`
-
-For script 6, do:
-```
-python -m venv hpc_py10_env
-source hpc_py10_env/bin/activate
-pip install -r environments/requirements_py10.txt
-```
-Run:
-6. `build_residuals_validation.py` using `submit_residuals.py`
-
-### Supplemental analyses and figures
-If you skipped the data analysis part, download the results and data files from (LINK). Set up the local Python environment:
-
-```
-python -m venv env
-source env/bin/activate
-pip install -r environments/requirements_local.txt
-```
-Run:
-1. `medication_usage.ipynb`
-2. `convert_ados.ipynb`
-3. `correlate_severity.ipynb`
-
-#### Figures
-1. `get_boot_ids.py` - run this first.
-2. `figure_1_network.ipynb`
-3. `figure_1supplementary_null.ipynb`
-4. `figure_2_profile.ipynb`
-5. `figure_2supplementary_performance.ipynb`
-6. `figure_3_nuisance.ipynb`
-7. `figure_4_dice.ipynb`
-8. `figure_4_ppv.ipynb`
-9. `figure_7_conformal_space.ipynb`
