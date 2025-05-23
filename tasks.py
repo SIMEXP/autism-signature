@@ -84,8 +84,6 @@ def run_discovery(c, network, replication, debug=False):
         replication (int): index of bootstrap replication using 0-indexing
         debug (bool): set TRUE to enable debugging behavior in R script
     """
-    import os
-
     # Config-driven paths
     output_dir = c.config.get("output_discovery", "output_data/Discovery")
     working_dir = c.config.get("source_fmri_dir", "source_data/Data")
@@ -97,16 +95,19 @@ def run_discovery(c, network, replication, debug=False):
 
     os.makedirs(output_dir, exist_ok=True)
 
-    result_file = os.path.join(output_dir, f"Results_Instance_{replication + 1}_Network_{network + 1}.csv")
+    rep = int(replication) + 1 # cursed 1 indexing
+    net = int(network) + 1 # cursed 1 indexing
+
+    result_file = os.path.join(output_dir, f"Results_Instance_{rep}_Network_{net}.csv")
 
     if os.path.exists(result_file):
         print(f"🟡 Skipping existing: {result_file}")
         return
 
-    print(f"🔮 Running replicate {replication + 1}, network {network + 1}")
+    print(f"🔮 Running replicate {rep}, network {net}")
     cmd = (
         f"Rscript code/data_analysis/discovery_conformal_score.R "
-        f"{replication + 1} {replication + 1} {network + 1} {working_dir} {output_dir} {debug_flag}"
+        f"{rep} {rep} {net} {working_dir} {output_dir} {debug_flag}"
     )
     c.run(cmd)
 
