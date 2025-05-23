@@ -1,5 +1,6 @@
 # Local docker image
 autism_signature.tar.gz
+autism_signature.sif
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

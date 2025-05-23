@@ -11,6 +11,7 @@ from tasks_utils import (
     docker_archive,
     docker_setup,
     docker_run,
+    apptainer_archive, 
     apptainer_run,
     fetch_from_zenodo,
     run_figures

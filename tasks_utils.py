@@ -91,7 +91,9 @@ def _ensure_docker_image_loaded(c, image, image_tar):
 
     result = c.run(f"docker images -q {image}", hide=True, warn=True)
     if result.stdout.strip():
-        return  # Image already present
+        # Ensure it's tagged as :latest for Apptainer
+        c.run(f"docker tag {image} {image}:latest", warn=True)
+        return
 
     print(f"📦 Docker image '{image}' not found. Attempting to load from {image_tar}...")
 
@@ -111,6 +113,8 @@ def _ensure_docker_image_loaded(c, image, image_tar):
         c.run(f"docker load -i {image_tar}")
     else:
         raise ValueError("❌ Unsupported container format. Use .tar or .tar.gz")
+    # Tag the loaded image
+    c.run(f"docker tag {image} {image}:latest", warn=True)
 
 @task
 def docker_run(c, task, args=""):
@@ -135,28 +139,29 @@ def docker_run(c, task, args=""):
     c.run(docker_cmd)
 
 ## Apptainer
-def _ensure_apptainer_image_exists(c, image_path, docker_image):
+@task
+def apptainer_archive(c, image=None):
     """
-    Ensure the specified Apptainer image exists. If not, try to convert from Docker.
+    Archive the Apptainer (Singularity) image from a Docker image using Docker daemon.
+    Builds the .sif file if not present.
     """
+    image = _set_image(c, image)
+    sif_path = Path(f"{image}.sif")
+
     if not shutil.which("apptainer"):
-        raise RuntimeError("❌ Apptainer is not installed or not in PATH. Please install Apptainer.")
+        raise RuntimeError("❌ Apptainer is not installed or not in PATH. Please install it.")
 
-    image_path = Path(image_path)
-    if image_path.exists():
-        return  # Image already exists
-
-    print(f"📦 Apptainer image not found at {image_path}. Attempting to build from Docker image '{docker_image}'...")
+    if sif_path.exists():
+        print(f"✅ Apptainer image already exists at {sif_path}. Skipping build.")
+        return
 
     if not shutil.which("docker"):
-        raise RuntimeError("❌ Docker is required to convert image but is not installed or not in PATH.")
+        raise RuntimeError("❌ Docker is required to build from Docker image. Please install it.")
 
-    # Ensure Docker image is loaded first
-    image_tar = f"{docker_image}.tar.gz"
-    _ensure_docker_image_loaded(c, docker_image, image_tar)
-
-    # Convert to Apptainer image
-    c.run(f"apptainer build {image_path} docker-daemon://{docker_image}")
+    _ensure_docker_image_loaded(c, image, f"{image}.tar.gz")
+    print(f"🧪 Building Apptainer image {sif_path} from Docker image {image}:latest...")
+    c.run(f"apptainer build {sif_path} docker-daemon:{image}:latest")
+    print("✅ Apptainer image build complete.")
 
 @task
 def apptainer_run(c, task, args=""):
@@ -167,15 +172,16 @@ def apptainer_run(c, task, args=""):
         task (str): the invoke task to run
         args (str): any additional CLI args to pass to the task
     """
-    docker_image = c.config.get("container_image")
-    apptainer_image = f"{docker_image}.sif"
+    docker_image = c.config.get("docker_image")
+    sif_path = Path(f"{docker_image}.sif")
 
-    _ensure_apptainer_image_exists(c, apptainer_image, docker_image)
+    if not sif_path.exists():
+        raise FileNotFoundError(f"❌ Apptainer image not found: {sif_path}")
 
     hostdir = os.getcwd()
     workdir = "/home/jovyan/work"
     cmd = f"invoke {task} {args}"
-    apptainer_cmd = f"apptainer exec --bind {hostdir}:{workdir} {apptainer_image} {cmd}"
+    apptainer_cmd = f"apptainer exec --bind {hostdir}:{workdir} {sif_path} {cmd}"
 
     print(f"🧪 Running inside Apptainer: {cmd}")
     c.run(apptainer_cmd)

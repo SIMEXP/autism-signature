@@ -10,7 +10,7 @@ The entire workflow—data fetching, processing, and figure generation—can be 
 
 ## 🚀 Quick Start
 
-### 1️⃣ Environment Setup
+### 1️⃣ Install invoke
 
 First, install `invoke`:
 
@@ -18,58 +18,45 @@ First, install `invoke`:
 pip install invoke
 ```
 
-To set up everything:
-
-```bash
-invoke setup-all
-```
-
-This:
-
-* builds (or sets up) the Docker container;
-* sets up Python & R environments (if running locally);
-* prepares the folder structure.
-
-**Note:**
-This task assumes an Ubuntu-like operating system. You will still need to have a number of dependencies installed, such as R and Python. Check the Docker build file (`Dockerfile`) for more info on installing all required dependencies.
-
-**Note 2:**
-You can skip this step if you choose to run the analysis in a docker container, provided you have docker installed and complete the following steps using invoke.
-
+You will also need to have either Docker or Apptainer installed in order to use either containarization methods.
 ---
 
-### 2️⃣ Fetch Data & Results
+### 2️⃣ Fetch Assets
 
-Download all necessary data & results:
+Download all necessary data, results, and container images:
 
 ```bash
 invoke fetch-all
 ```
 
 This populates:
-
+* `autism-signature.tar.gz`(a docker container image)
 * `source_data/` (fMRI + atlas);
 * `output_data/Results` (pre-generated results).
 
+> 💡 This commands downloads 7 GB of assets from the platform zenodo, and may take minutes to hours to run, depending on the speed of your internet connection.
 ---
 
-### 3️⃣ Run Full Pipeline
+### 3️⃣ Run Full Pipeline using a container
+
+To run tasks **inside the Docker container** (here using 2 parallel threads):
 
 ```bash
-invoke run-all
+invoke docker-run --task run-all --args "--threads=2"
 ```
 
-This runs:
-
-* **Discovery** (conformal score analysis);
-* **Score aggregation**;
-* **Figure generation**.
-
-**Smoke test:** To quickly test the setup with a single replication:
-
+This ensures the entire environment (Python, R, deps) is fully controlled. The container image includes a snapshot of all the required dependencies, starting with a jupyter notebook docker stack image. To run a smoke test inside the container:
 ```bash
-invoke run-all --smoke-test
+invoke docker-run --task run-all --args "--threads=2 --smoke-test"
 ```
+> 💡 This command will add the autism-signature image to your docker registry and will run the image with the `latest` tag, the first time it is run
+
+> 💡💡 Starting from a clean run, a full run generates 1.5 GB of results inside `output_data` and can take several hours using 20 threads. Each thread requires about 8GB of RAM. The smoke test only runs for a few minutes.
+
+It is also possible to use Apptainer instead, using `apptainer-run` in place of `docker-run`.
+
+> 💡 The `apptainer-run` task automatically checks if Apptainer is installed, ensures the image is loaded, and launches the task with the correct bind paths.
+
 
 ---
 
@@ -82,23 +69,28 @@ invoke clean-all
 ```
 
 ---
+### 🔪 Running on a Cluster with Apptainer + SLURM
 
-## 🛣️ Using the docker Container
+If you're on an HPC system with Apptainer (formerly Singularity), you can run the full pipeline with a single SLURM job.
 
-To run tasks **inside the Docker container** (here using 4 threads):
+1. Make sure Apptainer is available on your system:
 
 ```bash
-invoke docker-run --task run-all --args "--threads=4"
+module load apptainer
 ```
 
-You will need docker installed for this to work though. This ensures the entire environment (Python, R, deps) is fully controlled. If you use that route, you are not required to complete `invoke setup-all`. The container image includes a snapshot of all the required dependencies, starting with a jupyter notebook docker stack image. To run a smoke test inside the container:
+2. Then, submit the job:
+
 ```bash
-invoke docker-run --task run-all --args "--threads=4 --smoke-test"
+sbatch slurm_run_all.sh
 ```
 
+This script will request **20 CPUs**, **160GB of RAM**, and run the full analysis with:
 
+```bash
+invoke apptainer-run --task run-all --args "--threads=20"
+```
 ---
-
 ## 📁 Folder Structure
 
 | Folder                        | Description                                              |
@@ -124,10 +116,45 @@ invoke docker-run --task run-all --args "--threads=4 --smoke-test"
 
 ---
 
-## ✅ Minimal Example
+## Building the environment
+
+### Installing dependencies
+To set up everything, you will first need a functional Python and R environment and run:
 
 ```bash
 invoke setup-all
-invoke fetch-all
-invoke container-run --task run-all --args "--smoke-test --threads=4"
+```
+
+This:
+
+* sets up Python & R environments (if running locally);
+* prepares the folder structure.
+
+**Note:**
+This task assumes an Ubuntu-like operating system. You will still need to have a number of dependencies installed, such as R and Python. Check the Docker build file (`Dockerfile`) for more info on installing all required dependencies.
+
+**Note 2:**
+You can skip this step if you choose to build the environment in a docker container, provided you have docker installed and complete the following steps.
+
+### Create a docker image
+To build a docker image:
+
+```bash
+invoke docker-build
+```
+This:
+* builds (or sets up) the Docker container;
+* see the file `Dockerfile` for details of the set up;
+* note that `invoke setup-all` is used to deploy all dependencies.
+
+To generate a binary archive:
+```bash
+invoke docker-archive
+```
+
+### Create an apptainer image
+To build an apptainer sif image, you need to first build a docker image (see above) and run:
+
+```bash
+invoke apptainer-build
 ```
