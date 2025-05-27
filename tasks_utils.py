@@ -181,7 +181,7 @@ def apptainer_run(c, task, args=""):
     hostdir = os.getcwd()
     workdir = "/home/jovyan/work"
     cmd = f"invoke {task} {args}"
-    apptainer_cmd = f"apptainer exec --bind {hostdir}:{workdir} {sif_path} {cmd}"
+    apptainer_cmd = f"apptainer exec --cleanenv --bind {hostdir}:{workdir} {sif_path} {cmd}"
 
     print(f"🧪 Running inside Apptainer: {cmd}")
     c.run(apptainer_cmd)
