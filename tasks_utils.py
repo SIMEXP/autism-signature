@@ -219,6 +219,10 @@ def fetch_from_zenodo(c, name=None):
         print(f"🧠 '{name}' already extracted at {dest_dir}")
         return
 
+    if not dest_dir and os.path.exists(archive_path):
+        print(f"🧠 '{name}' already extracted at {archive_path}")
+        return
+
     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
     print(f"📥 Downloading '{name}' from {url}...")
     c.run(f"wget -O {archive_path} '{url}'")
