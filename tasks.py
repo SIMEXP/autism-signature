@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 import random
 from tasks_utils import (
+    setup_env_python,
     clean_folder,
     docker_build,
     docker_archive,
