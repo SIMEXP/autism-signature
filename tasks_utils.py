@@ -211,15 +211,17 @@ def fetch_from_zenodo(c, name=None):
     url = conf.get("url")
     dest_dir = conf.get("dest")  # optional
     archive_path = conf.get("archive")
+    if dest_dir:
+        path_done = Path(dest_dir, f"{name}.downloaded")
 
     if not url or not archive_path:
         raise ValueError(f"Missing url or archive path in config for '{name}'.")
 
-    if dest_dir and os.path.exists(dest_dir):
+    if dest_dir and path_done.exists():
         print(f"🧠 '{name}' already extracted at {dest_dir}")
         return
 
-    if not dest_dir and os.path.exists(archive_path):
+    if (not dest_dir) and os.path.exists(archive_path):
         print(f"🧠 '{name}' already extracted at {archive_path}")
         return
 
@@ -239,6 +241,7 @@ def fetch_from_zenodo(c, name=None):
             raise ValueError(f"Cannot extract archive format: {archive_path}")
 
         c.run(f"rm {archive_path}")
+        path_done.touch() # create a lock file to flag successful download
         print(f"✅ Done extracting '{name}'")
     else:
         print(f"📦 Downloaded raw archive for '{name}' to {archive_path} (no extraction)")

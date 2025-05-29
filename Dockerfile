@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 USER $NB_UID
 RUN pip install invoke
 COPY tasks.py ./tasks.py
+COPY tasks_utils.py ./tasks_utils.py
 
 # R install
 USER root
