@@ -1,0 +1,46 @@
+# invoke.yaml
+docker_image: autism_signature
+
+# Code folder
+code_dir: code
+
+# Notebooks folders
+notebooks_dir: code/figures
+supplemental_notebooks_dir: code/supplemental
+
+# source data folders
+source_data_dir: source_data
+source_fmri_dir: source_data/Data
+
+# output data folders
+output_data_dir: output_data
+output_discovery: output_data/Discovery
+output_validation: output_data/Validation
+output_null: output_data/Null
+figures_dir: output_data/Figures
+supplemental_figures_dir: output_data/Supplemental
+
+# Zenodo data sources
+fetch_zenodo:
+  atlas:
+    url: https://zenodo.org/records/15517157/files/ATLAS.zip?download=1
+    dest: source_data/
+    archive: source_data/ATLAS.zip
+
+  fmri:
+    url: https://zenodo.org/records/15517157/files/Data.zip?download=1
+    dest: source_data/
+    archive: source_data/Data.zip
+
+  results:
+    url: https://zenodo.org/records/15517157/files/Results.zip?download=1
+    dest: output_data/
+    archive: output_data/Results.zip
+
+  docker:
+    url: https://zenodo.org/records/15517157/files/autism_signature.tar.gz?download=1
+    archive: ./autism_signature.tar.gz
+
+  apptainer:
+    url: https://zenodo.org/records/15517157/files/autism_signature.sif?download=1
+    archive: ./autism_signature.sif

@@ -1,65 +1,173 @@
-# Code for the high risk autism phenotype paper
+# Code for the 🧠 high risk autism phenotype paper
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
 
-Much of the code in this repo originated from [ASD High Risk Endophenotype Code Supplement](https://github.com/surchs/ASD_high_risk_endophenotype_code_supplement) and was written by Sebastian Urchs and Hien Nguyen.
+This repository implements a **fully reproducible pipeline** for the autism signature project. It uses `invoke` tasks and a Docker container for **consistent, cross-platform execution.**
 
-### Data availability
+The entire workflow—data fetching, processing, and figure generation—can be **reproduced in a few commands.**
+Much of the code in this repo originated from [ASD High Risk Endophenotype Code Supplement](https://github.com/surchs/ASD_high_risk_endophenotype_code_supplement) and was written by Sebastian Urchs and Hien Nguyen.
 All data to reproduce the analysis can be downloaded from [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15192559.svg)](https://doi.org/10.5281/zenodo.15192559)
 
 - The study uses data from ABIDE 1 and 2 datasets. Participants were matched using propensity score matching as part of another project, matching scripts can be found here [ASD Subtype Code Supplement](https://github.com/surchs/ASD_subtype_code_supplement/tree/master/scripts/pheno).
 - Resting state functional connectivity data was preprocessed using NIAK, described in the paper. This study uses the seed maps.
 - Using the following scripts the full analysis can be reproduced. Alternatively, to skip the data analysis part and recreate the figures, download only the results and atlas data from Zenodo.
 
-### Data analysis
-These steps were run on the Alliance Canada Beluga server.
 
-On an HPC server, first set up the R environment. After cloning the repository:
-1. Open R in the project directory
-2. ```R install.packages("renv") renv::restore() ```
+## 🚀 Quick Start
 
-For scripts 1-5 do:
-```
-python -m venv hpc_py11_env
-source hpc_py11_env/bin/activate
-pip install -r environments/requirements_py11.txt
+### 1⃣ Install invoke
+
+First, install `invoke`:
+
+```bash
+pip install invoke
 ```
 
-Update the paths and slurm preamble, then run:
-1. `Discovery_Conformal_Score.R` using `submit_discovery.sh`
-2. `Discovery_Read_Conformal_Scores.R`
-3. `Validation_Conformal_Score_Boot.R` using `submit_validation.sh`
-4. `Validation_Read_Conformal_Scores.R`
-5. `Null_Model.R` using `submit_null.sh`
+You must also have either Docker or Apptainer installed to use container-based execution.
 
-For script 6, do:
-```
-python -m venv hpc_py10_env
-source hpc_py10_env/bin/activate
-pip install -r environments/requirements_py10.txt
-```
-Run:
-6. `build_residuals_validation.py` using `submit_residuals.py`
+---
 
-### Supplemental analyses and figures
-Make sure you have downloaded the atlas files from Zenodo. If you skipped the data analysis part, just download the results and data files. Set up the local Python environment:
+### 2⃣ Fetch Assets
 
-```
-python -m venv env
-source env/bin/activate
-pip install -r environments/requirements_local.txt
-```
-Run:
-1. `medication_usage.ipynb`
-2. `convert_ados.ipynb`
-3. `correlate_severity.ipynb`
+Download all necessary data, results, and container images:
 
-#### Figures
-1. `get_boot_ids.py` - run this first.
-2. `figure_1_network.ipynb`
-3. `figure_1supplementary_null.ipynb`
-4. `figure_2_profile.ipynb`
-5. `figure_2supplementary_performance.ipynb`
-6. `figure_3_nuisance.ipynb`
-7. `figure_4_dice.ipynb`
-8. `figure_4_ppv.ipynb`
-9. `figure_7_conformal_space.ipynb`
+```bash
+invoke fetch-all
+```
+
+This populates:
+* `autism-signature.tar.gz` (a Docker container image from Zenodo)
+* `autism-signature.sif` (an Apptainer container image from Zenodo)
+* `source_data/` (fMRI + atlas);
+* `output_data/Results` (pre-generated results).
+
+> 💡 This command downloads ~7.5 GB of assets from Zenodo and may take minutes to hours depending on your internet speed.
+
+### 3⃣ Run Full Pipeline using a container
+
+To run tasks **inside the Docker container** (here using 2 parallel threads):
+
+```bash
+invoke docker-run --task run-all --args "--threads=2"
+```
+
+This ensures the entire environment (Python, R, dependencies) is fully controlled. The image includes a snapshot of all required software, based on a Jupyter notebook Docker stack image.
+
+To run a smoke test inside the container:
+
+```bash
+invoke docker-run --task run-all --args "--threads=2 --smoke-test"
+```
+
+> 💡 This will load `autism-signature` into your Docker registry the first time and run it with the `latest` tag.
+
+> 💡💡 A full run generates ~1.5 GB of results; the smoke test only MBs.
+
+> 💡💡💡 A complete recompute takes ~30 minutes per replicate/network (about 37 days total serial time). Use archives or HPC to save time and energy.
+
+> 💡💡💡💡 Each thread requires ~8 GB RAM.
+
+Apptainer is also supported. Use `apptainer-run` in place of `docker-run`.
+
+> 💡 The `apptainer-run` task checks for Apptainer, verifies image presence, and launches with correct bind paths.
+
+---
+
+### 4⃣ Clean Everything
+
+To remove all generated data:
+
+```bash
+invoke clean-all
+```
+
+---
+### 🔪 Running on a Cluster with Apptainer + SLURM
+
+On an HPC system with Apptainer (formerly Singularity):
+
+1. Ensure Apptainer is available:
+
+```bash
+module load apptainer
+```
+
+2. Submit the job:
+
+```bash
+sbatch slurm_run_all.sh
+```
+
+This script requests **20 CPUs**, **160 GB RAM**, and runs:
+
+```bash
+invoke apptainer-run --task run-all --args "--threads=20"
+```
+Some variables are hard-coded to run on the infrastructure of Digital Alliance of Canada using the allocation resource of the SIMEXP lab.
+
+---
+## 📁 Folder Structure
+
+| Folder                        | Description                                              |
+| ----------------------------- | -------------------------------------------------------- |
+| `source_data/`                | Raw data: Atlases & fMRI data.                           |
+| `output_data/`                | All generated outputs: Discovery results, figures, etc.  |
+| `code/figures/`               | Jupyter notebooks used to generate all figures.          |
+| `output_data/Figures/`        | Output folders for each figure notebook.                 |
+| `tasks.py` / `tasks_utils.py` | The heart of the pipeline: all `invoke` tasks live here. |
+
+---
+
+## 📝 Key Tasks Overview
+
+| Task                   | What it Does                                                        |
+| ---------------------- | ------------------------------------------------------------------- |
+| `setup-all`            | Sets up container + environment + folder structure.                 |
+| `fetch-all`            | Downloads all data & results from Zenodo.                           |
+| `run-all`              | Runs full pipeline (discovery + scores + figures).                  |
+| `run-all --smoke-test` | Runs a quick smoke test (1 replication).                            |
+| `clean-all`            | Removes all generated outputs.                                      |
+| `container-run`        | Runs any task inside the Docker container (e.g., `--task run-all`). |
+
+---
+
+## Building the environment
+
+### Installing dependencies
+To set up everything, ensure functional Python and R environments and run:
+
+```bash
+invoke setup-all
+```
+
+This:
+
+* sets up Python & R environments (if running locally);
+* prepares the folder structure.
+
+**Note:**
+This task assumes an Ubuntu-like OS. You still need to install R, Python, etc. See the Dockerfile for complete setup info.
+
+**Note 2:**
+You can skip this if using the Docker container and running `docker-run` directly.
+
+### Create a Docker image
+To build a Docker image:
+
+```bash
+invoke docker-build
+```
+
+To generate a compressed archive:
+
+```bash
+invoke docker-archive
+```
+
+### Create an Apptainer image
+After building the Docker image, run:
+
+```bash
+invoke apptainer-archive
+```
+
+This builds the `.sif` image from the Docker daemon.
