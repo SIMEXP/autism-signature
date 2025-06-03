@@ -1,12 +1,16 @@
 # Code for the 🧠 high risk autism phenotype paper
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
-[![DOI](https://img.shields.io/badge/DOI-10.1101%2F2020.06.01.127688%20-informational)](https://doi.org/10.1101/2020.06.01.127688 )
 
 This repository implements a **fully reproducible pipeline** for the autism signature project. It uses `invoke` tasks and a Docker container for **consistent, cross-platform execution.**
 
 The entire workflow—data fetching, processing, and figure generation—can be **reproduced in a few commands.**
+Much of the code in this repo originated from [ASD High Risk Endophenotype Code Supplement](https://github.com/surchs/ASD_high_risk_endophenotype_code_supplement) and was written by Sebastian Urchs and Hien Nguyen.
+All data to reproduce the analysis can be downloaded from [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15192559.svg)](https://doi.org/10.5281/zenodo.15192559)
 
----
+- The study uses data from ABIDE 1 and 2 datasets. Participants were matched using propensity score matching as part of another project, matching scripts can be found here [ASD Subtype Code Supplement](https://github.com/surchs/ASD_subtype_code_supplement/tree/master/scripts/pheno).
+- Resting state functional connectivity data was preprocessed using NIAK, described in the paper. This study uses the seed maps.
+- Using the following scripts the full analysis can be reproduced. Alternatively, to skip the data analysis part and recreate the figures, download only the results and atlas data from Zenodo.
+
 
 ## 🚀 Quick Start
 
@@ -37,8 +41,6 @@ This populates:
 * `output_data/Results` (pre-generated results).
 
 > 💡 This command downloads ~7.5 GB of assets from Zenodo and may take minutes to hours depending on your internet speed.
-
----
 
 ### 3⃣ Run Full Pipeline using a container
 
