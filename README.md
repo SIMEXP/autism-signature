@@ -5,7 +5,7 @@ This repository implements a **fully reproducible pipeline** for the autism sign
 
 The entire workflow—data fetching, processing, and figure generation—can be **reproduced in a few commands.**
 Much of the code in this repo originated from [ASD High Risk Endophenotype Code Supplement](https://github.com/surchs/ASD_high_risk_endophenotype_code_supplement) and was written by Sebastian Urchs and Hien Nguyen.
-All data to reproduce the analysis can be downloaded from [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15517157.svg)](https://doi.org/10.5281/zenodo.15517157)  
+All data to reproduce the analysis can be downloaded from [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15706115.svg)](https://doi.org/10.5281/zenodo.15706115).  
 
 - The study uses data from ABIDE 1 and 2 datasets. Participants were matched using propensity score matching as part of another project, matching scripts can be found here [ASD Subtype Code Supplement](https://github.com/surchs/ASD_subtype_code_supplement/tree/master/scripts/pheno).
 - Resting state functional connectivity data was preprocessed using NIAK, described in the paper. This study uses the seed maps.
